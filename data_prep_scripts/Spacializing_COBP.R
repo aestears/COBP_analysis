@@ -82,6 +82,7 @@ ggplot(butterfly[butterfly$Plot_ID == "S9",]) +
   geom_hline(aes(yintercept = c(200))) +
   theme_classic()
 
+
+rm(list = (ls()[2:12]))
 ## save a version of the spatialized data
-write.csv(x = butterfly, file = "../Processed_Data/spatial_COBP.csv", 
-          row.names = FALSE)
+save.image(file = "../Processed_Data/spatial_COBP.RData")
