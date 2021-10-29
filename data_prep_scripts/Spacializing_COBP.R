@@ -3,7 +3,7 @@ library(sf)
 
 ## load COBP demographic data
 ## remove data that isn't necessary (notes, leaf spots, invert, stem #s, #capsules, bolting)
-butterfly_temp <- read.csv("../Raw Data/COBP_data_10_25_20.csv") %>% 
+butterfly_temp <- read.csv("../../Oenothera coloradensis project/Raw Data/COBP_data_08_23_21.csv") %>% 
   select(c("Location", "Site", "Plot_ID", "Quadrant", "ID", "X_cm", "Y_cm", "LongestLeaf_cm_2018", "Alive_2018", "LongestLeaf_cm_2019", "Alive_2019", "LongestLeaf_cm_2020", "Alive_2020"))
 
 ## remove messed up rows (for now...)
@@ -24,7 +24,7 @@ butterfly <- left_join(butterfly_1, butterfly_2)
 
 ## generate a survives_tplus1 column 
 ## give an 'NA' to all individuals in 2020 (no sampling in 2021)
-butterfly$survives_tplus1 <- NULL
+butterfly$survives_tplus1 <- NA
 #butterfly[butterfly$Year == 2020, "survives_tplus1"] <- NA
 ## give the survival status from the next year to the current year
 ## assing an arbitrary index to each row in 'butterfly' 
@@ -40,35 +40,43 @@ for (i in unique(butterfly$Plot_ID)) {
     temp_1 <- temp_1[order(temp_1$Year),]
     ## make sure that there is data for more than one year (otherwise just data 
     # for 2020 exists, which already has an NA for survival)
+    ## if there is an NA in the 'survives_t column? if so, remove that obs.
+    temp_1 <- temp_1[is.na(temp_1$survives_t) == FALSE,]
     if (nrow(temp_1) > 1) {
-      ## get a vector of the survival values
-      surv <- temp_1$survives_t
-      ## remove the first value (don't care if it is alive in the first year)
-      survNew <- c(surv[2:length(surv)], NA)
-      temp_1$survives_tplus1 <- survNew 
-      # ## put the data back into 'butterfly' 
-      # butterfly[which(butterfly$index == temp_1$index), "survives_tplus1"] <- 
-      #   temp_1$survives_tplus1
-      if (exists("datOut") == FALSE) {
-        datOut <- temp_1
-      } else {
-        datOut <- rbind(datOut, temp_1)
-      }
+      # ## check that the years are consecutive
+      # if (sum((c(temp_1$Year, NA) - c(NA, temp_1$Year) != 1), na.rm = TRUE) != 0){
+      #   ## if they are *not* consecutive
+      #   temp_1
+      # } else {
+      #   ## if the years *are* consecutive
+        ## get a vector of the survival values
+        surv <- temp_1$survives_t
+        ## remove the first value (don't care if it is alive in the first year)
+        survNew <- c(surv[2:length(surv)], NA)
+        temp_1$survives_tplus1 <- survNew 
+        # ## put the data back into 'butterfly' 
+        # butterfly[which(butterfly$index == temp_1$index), "survives_tplus1"] <- 
+        #   temp_1$survives_tplus1
+    }
+    if (exists("datOut") == FALSE) {
+      datOut <- temp_1
+    } else {
+      datOut <- rbind(datOut, temp_1)
+    }
     }
   }
-}
 
 butterfly <- datOut
 ## remove plants that aren't alive in year t
 butterfly <- butterfly[butterfly$survives_t != 0 & is.na(butterfly$survives_t) == FALSE,]
 ## temporarily remove bad rows (missing leaf size data!)
-butterfly <- butterfly[is.na(butterfly$LongestLeaf_cm) == FALSE,]
+# butterfly <- butterfly[is.na(butterfly$LongestLeaf_cm) == FALSE,]
 
 ## convert the data to an sf format
 ## first make them points
 butterfly<- st_as_sf(butterfly, coords = c("X_cm", "Y_cm"))
-## add a buffer with a radius that's the size of the longest leaf
-butterfly <- st_buffer(butterfly, dist = butterfly$LongestLeaf_cm)
+## add a buffer with a radius of .5 cm 
+butterfly <- st_buffer(butterfly, dist = .5)
 
 
 ## test w/ a plot
@@ -85,4 +93,4 @@ ggplot(butterfly[butterfly$Plot_ID == "S9",]) +
 
 rm(list = (ls()[2:12]))
 ## save a version of the spatialized data
-save.image(file = "../Processed_Data/spatial_COBP.RData")
+save.image(file = "../../Oenothera coloradensis project/Processed_Data/spatial_COBP.RData")
