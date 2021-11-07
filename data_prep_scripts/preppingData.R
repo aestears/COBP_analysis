@@ -3,6 +3,7 @@
 # Alice Stears
 # 3 November 2021
 #///////////////
+library(tidyverse)
 ## load COBP demographic data
 ## remove data that isn't necessary (notes, leaf spots, invert, stem #s, #capsules, bolting)
 butterfly_temp <- read.csv("../../Oenothera coloradensis project/Raw Data/COBP_data_08_23_21.csv") %>% 
@@ -133,61 +134,6 @@ butterfly <- butterfly[butterfly$survives_t != 0 & is.na(butterfly$survives_t) =
 ## temporarily remove bad rows (missing leaf size data!)
 # butterfly <- butterfly[is.na(butterfly$LongestLeaf_cm) == FALSE,]
 butterfly$age <- as.integer(butterfly$age)
-
-## assign additional seedling data
-## load seedling data
-seeds <- read.csv("../Raw Data/COBP_seedlings_8_23_21.csv")
-## trim away unnecessary data from seeds d.f
-seeds <- seeds %>%
-  select(Location, Site, Plot_ID, Quadrant, Seedlings_18, Seedlings_19, Seedlings_20) %>%
-  pivot_longer(cols = c("Seedlings_18", "Seedlings_19", "Seedlings_20"), names_to = "Year", values_to = "seedlings_count")
-## correct year values
-seeds$Year <- as.integer(str_extract_all(seeds$Year, pattern = "[:digit:]+", simplify = TRUE)) + 2000
-seeds$ID <- "sdlng"
-seeds$X_cm <- NA
-seeds$Y_cm <- NA
-seeds$survives_t <- NA
-seeds$flowering <- NA
-seeds$Num_capsules <- NA
-seeds$Stem_Herb <- NA
-seeds$Invert_Herb <- NA
-seeds$LeafSpots <- NA
-seeds$survives_tplus1 <- NA
-seeds$longestLeaf_tminus1 <- NA  
-seeds$longestLeaf_tplus1 <- NA
-seeds$index <- NA
-seeds$age <- 0               
-seeds$log_LL_tplus1 <- NA
-seeds$log_LL_tminus1 <- NA 
-
-## make a table of the seedling counts added previously to 'butterfly'
-seedTable <- butterfly %>% 
-  filter(seedling == 1) %>% 
-  group_by(Plot_ID, Quadrant, Year) %>% 
-  summarise(seedlingCount = n())
-
-seedsTemp <- left_join(seeds, seedTable)
-seedsTemp[is.na(seedsTemp$seedlingCount),"seedlingCount"] <- 0
-seeds$seedlings_count <- seedsTemp$seedlings_count - seedsTemp$seedlingCount
-## if there is a negative number, make it a zero
-seeds[seeds$seedlings_count < 0,"seedlings_count"] <- 0
-seeds$survives_tplus1 <- 0
-seeds$seedling <- 1
-
-## make repeating rows for each quadrant for the no. of seedlings
-seeds <- as.data.frame(lapply(seeds, rep, seeds$seedlings_count))
-
-## use a uniform distribution to randomly assign sizes to the seedlings
-seeds$LongestLeaf_cm <- round(runif(n = nrow(seeds), min = .1, max = 3),2)
-seeds$log_LL_t <- log(seeds$LongestLeaf_cm) 
-
-## remove the 'seeedlings_count column' and reorder columns
-seeds <- seeds %>% 
-  select(-seedlings_count) %>% 
-  select(names(butterfly))
-
-## add seedlings to other data
-butterfly <- rbind(butterfly, seeds)
 
 ## write this long-form data to file
 write.csv(butterfly, file = "../Raw Data/COBP_long_CURRENT.csv", row.names = FALSE)
