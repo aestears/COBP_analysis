@@ -81,19 +81,6 @@ for (i in unique(butterfly$Plot_ID)) {
     # for 2020 exists, which already has an NA for survival and size_t-1)
     ## if there is an NA in the 'survives_t column? if so, remove that obs.
     temp_1 <- temp_1[is.na(temp_1$survives_t) == FALSE,]
-    ## For 'first year' obs (in 2019 and 2020), make an obs. from the year before that is a seedling 
-    if (as.integer(temp_1[1,"Year"]) != 2018) {
-      ## make a new row for the seedling
-      seedling <- temp_1[1,]
-      ## make year the previous year
-      seedling$Year <- as.integer(temp_1[1,"Year"] - 1)
-      seedling$LongestLeaf_cm <- round(runif(n = 1, min = .1, max = 3),2)
-      seedling[,c("survives_t", "survives_tplus1", "seedling")] <- 1
-      seedling$flowering <- NA
-      seedling[,c("Num_capsules", "Stem_Herb", "Invert_Herb", "LeafSpots", "longestLeaf_tminus1")] <- NA
-      ## add the new row to the existing data
-      temp_1 <- rbind(seedling, temp_1)
-    }
     if (nrow(temp_1) > 1) {
       ## get survival data
       ## get a vector of the survival values

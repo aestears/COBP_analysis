@@ -15,35 +15,22 @@ library(tidyverse)
 ```
 # Background
 ### *Oenothera coloradensis* life-cycle diagram
-![Figure of the O. coloradensis life-cycle, with transitions labeled](images/COBP_diagram.jpg)
+![Figure of the O. coloradensis life-cycle, with transitions labeled](images/COBP_lifecyclediagram.jpg)
+
 ### Functions in the IPM kernel
-With a time lag for flowering (influenced by size in year t-1 rather than year 1) and a discrete seedbank stage
+For data from a pre-reproductive census, with a discrete seedling and seedbank stages 
+
 $n(z',t+1) = $
 
-**Fecundity:**
-$$\int_{L}^{U}(1-p_b(z))s(z)G(z',z)n(z,t)dz$$
+**Growth:**
+$$P(z',z) = \int_{L}^{U}(1-p_b(z))s(z)G(z',z)n(z,t)dz$$
 plus ... 
 
-**Growth:**
-$$C_0(z') \Big[ p_{germ}\int_{L}^{U}p_b(z)n(z,t-1)dz+p_{SBout}B(t) \Big] $$
+**Fecundity:** With a time lag for flowering probability and 
+$$F(z',z) = C_0(z') \Big[p_{germ}\int_{L}^{U}p_b(z)n(z,t-1)dz+p_{SBout}B(t) \Big] $$
 
-**Seedbank:**   
-$$B(t+1) = p_{SBstay}B(t)+p_{goSB}\int_{L}^{U}p_b(z)b(z)n(z,t)dz$$
-
-where...
-
-$n(z’,t+1)$ = the distribution of indivdiauls of size *z* in time *t+1*   
-$z$ = the distribution of plant size in year *t*    
-$z’$ = distribution of plant size in year *t+1*   
-$p_b(z)$ = probability of reproduction as a function of size *z*   
-$s(z)$ = probability of survival as a function of size *z*    
-$G(z’,z)$ = kernel that determines the distribution of size in year *t+1* (*z’*) as a function of size in year *t* (*z*)   
-$C_0(z’)$ = size distribution of new recruits   
-$b(z)$ = number of offspring produced per individual as a function of size *z*    
-$B(t)$ = size of seedbank in year *t*   
-$U$ =upper limit of plant size    
-$L$ =lower limit of plant size   
-$n(z,t)/n(z,t-1$) = distribution of individuals of size *z'* in year *t* (or *t-1*) as a function of size *z*   
+**Seedbank:**   (after Ellner, 2016)
+$$B(t+1) = s_{B}\Big[(1-\gamma)B(t)+\delta\int_{L}^{U}p_b(z)b(z)n(z,t)dz \Big]$$
 
 # Load *Oenothera coloradensis* census data
 ```{r}
@@ -86,7 +73,7 @@ lines(x = newdata$log_LL_t, y = predict(object = survMod, newdata =  newdata, ty
 # plot(log_LL_tplus1 ~ log_LL_t, data = dat)
 
 ## lm w/ log-transformed size_t and size_t+1
-sizeMod <- lm(log_LL_tplus1 ~ log_LL_t, data = dat)
+sizeMod <- lm(log_LL_tplus1 ~ log_LL_t , data = dat)
 summary(sizeMod)
 ## plot model results
 plot(log_LL_tplus1 ~ log_LL_t, data = dat)
@@ -116,9 +103,6 @@ lines(x = newdata$log_LL_t, y = predict(object = seedMod_t, newdata =  newdata, 
 ### Fecundity
 using size in previous year (no. of seeds/plant, for those that flowered ~ size_tminus1)
 ```{r}
-## visualize the data
-plot(Num_capsules ~ log_LL_tminus1, data = seedDat)
-
 ## fit poisson glm (for count data)
 seedMod_tminus1 <- glm(Num_capsules ~ log_LL_tminus1, data = seedDat, family = poisson)
 summary(seedMod_tminus1)
@@ -134,9 +118,6 @@ lines(x = newdata$log_LL_tminus1, y = predict(object = seedMod_tminus1, newdata 
 ### Flowering probability
 using size in current year
 ```{r}
-## visualize the data
-plot(flowering ~ log_LL_t, data = dat)
-
 ## logistic glm with log-transformed size_t
 flwrMod_t <- glm(flowering ~ log_LL_t, data = dat, family = binomial)
 summary(flwrMod_t)
@@ -178,25 +159,31 @@ hist(recD$log_LL_t)
 abline(v = recMod$coefficients, col = "blue", lwd = 2)
 ```
 
-### Probability of establishment
+### Probability of establishment (and surviving through the seedbank stage)
 ```{r message=FALSE}
-## get the number of recruits/year and no. seeds/year
+## make a column in 'dat' that labels recruits
+dat$recruit <- 0
+dat[dat$age==0 & is.na(dat$age)==FALSE,"recruit"] <- 1
+## get the number of recruits/year 
 estabTemp <- dat %>% 
-  select(Plot_ID, Year, Num_capsules, seedling) %>% 
+  select(Plot_ID, Year, Num_capsules, seedling, recruit) %>% 
   group_by(Plot_ID, Year) %>% 
-  summarize(seeds = sum(Num_capsules, na.rm = TRUE), recruits = sum(seedling)) %>% 
+  summarize(seeds = sum(Num_capsules, na.rm = TRUE), recruits = sum(recruit)) %>% 
   rename(seeds_t = seeds, recruits_t = recruits) 
 
+## get the no.of seeds/year
 seedsTemp <- estabTemp %>% 
   select(Plot_ID, Year, seeds_t)
 
+## get the no. of recruits/year t-2 (since we're including the seedling stage in this step)
 recsTemp <- estabTemp %>% 
   select(Plot_ID, Year, recruits_t) %>% 
   rename(recruits_tplus1 = recruits_t) %>% 
-  mutate(Year = Year - 1)
+  mutate(Year = Year - 2)
 
 estabs <- left_join(seedsTemp, recsTemp)
 
+## calculate the 
 temp <- estabs$recruits_tplus1/estabs$seeds_t
 temp[is.infinite(temp)] <- NA
 (p.r.est <- mean(temp, na.rm = TRUE))
@@ -213,11 +200,11 @@ temp[is.infinite(temp)] <- NA
 ## Note: Vital rates #1 and #2, and #3 and #4 do not need to sum to 1. The remainder of each of these pairs accounts for seed mortality between years.  
 
 
-#### implement IPM ####
-### fit demography functions
+## Implement the IPM 
+### Write the demography functions
 
-## Growth function, given you are size z now returns the pdf of size z1 next time
-
+### Growth function, given you are size z (now returns the pdf of size z1 in the next year)
+```{r}
 G_z1z <- function(z1, z, m.par)
 {
   mu <- m.par["grow.int"] + m.par["grow.z"] * z           # mean size next year
@@ -225,35 +212,40 @@ G_z1z <- function(z1, z, m.par)
   p.den.grow <- dnorm(z1, mean = mu, sd = sig)             # pdf that you are size z1 given you were size z
   return(p.den.grow)
 }
+```
 
-## Survival function, logistic regression
-
+###  Survival function, logistic regression
+```{r}
 s_z <- function(z, m.par)
 {
   linear.p <- m.par["surv.int"] + m.par["surv.z"] * z  # linear predictor
   p <- 1/(1+exp(-linear.p))                            # logistic transformation to probability
   return(p)
 }
+```
 
-## Probability of flowering function, logistic regression
 
+### Probability of flowering function, logistic regression
+```{r}
 p_bz <- function(z, m.par)
 {
   linear.p <- m.par["flow.int"] + m.par["flow.z"] * z      # linear predictor
   p <- 1/(1+exp(-linear.p))                                # logistic transformation to probability
   return(p)
 }
+```
 
-## Seed production function
-
+### Seed production function
+```{r}
 b_z <- function(z, m.par)
 {
   N <- exp(m.par["seed.int"] + m.par["seed.z"] * z)    # seed production of a size z plant
   return(N)
 }
+```
 
-## Recruit size pdf
-
+### Recruit size pdf
+```{r}
 c_0z1 <- function(z1, m.par)
 {
   mu <- m.par["rcsz.int"]
@@ -261,21 +253,28 @@ c_0z1 <- function(z1, m.par)
   p.deRecr <- dnorm(z1, mean = mu, sd = sig)              # pdf of a size z1 recruit
   return(p.deRecr)
 }
+```
 
-## Define the survival kernel
+### Define the survival kernel
+```{r}
 P_z1z <- function (z1, z, m.par) {
   
   return((1 - p_bz(z, m.par)) * s_z(z, m.par) * G_z1z(z1, z, m.par))
   
 }
+```
 
-## Define the fecundity kernel
+### Define the fecundity kernel
+```{r}
 F_z1z <- function (z1, z, m.par) {
   
   return( p_bz(z, m.par) * b_z(z, m.par) * m.par["p.r"] * c_0z1(z1, m.par))
   
 }
+```
 
+### write the IPM kernel function
+```{r}
 mk_K <- function(m, m.par, L, U) {
   
   # mesh points 
@@ -298,7 +297,10 @@ mk_K_ceiling <- function(m, m.par, L, U, U1 = U) {
   K <- P + F;
   return(list(K = K, meshpts = meshpts, P = P, F = F))
 }
+```
 
+Additional functions to calculate lambdas and project vital rates
+```{r}
 #Function to calculate mean and variance in reproductive output for a size z
 
 get_mean_var_Repr <- function(init.z,n.samp) {
@@ -351,9 +353,14 @@ get_mean_var_Repr <- function(init.z,n.samp) {
   return(c(mean(Repr.out),var(Repr.out),mean(Repr.out>0),var(Repr.out>0)))
   
 }
+```
 
-## specify coefficients from models above
-## using t for flowering and fecundity
+## Actually fit the IPM to the COBP data
+
+### specify coefficients from models above
+(using *t* for flowering and fecundity)
+```{r}
+## get vital rate model coefficients
 m.par.est <- c(surv = coef(survMod),
                flow = coef(flwrMod_t),
                grow = coef(sizeMod),
@@ -365,23 +372,57 @@ m.par.est <- c(surv = coef(survMod),
                )
 names(m.par.est) <- c("surv.int", "surv.z", "flow.int", "flow.z",  "grow.int", "grow.z",   "grow.sd" , "rcsz.int", "rcsz.sd" , "seed.int", "seed.z"  , "p.r"   )  
 
- 
+## prepare the matrix
 nBigMatrix <- 250
 min.size <- with(dat, min(log_LL_t, na.rm = TRUE))
 min.size
 max.size <- with(dat, max(log_LL_t, na.rm = TRUE))
 max.size
 
-
+## fit the IPM
 IPM.est <- mk_K(nBigMatrix, m.par.est, -3, 4)
 
-## visualize kernel
-matrix.image(A = IPM.est$K, x = IPM.est$meshpts, y = IPM.est$meshpts)
+## cube the K matrix?
+IPM.cube <- (IPM.est$K)^3
+```
 
+### Visualize the IPM kernel
+```{r echo = FALSE}
+## matrix function, from Ellner
+matrix.image=function(A, x=NULL, y=NULL, col=rainbow(100,start=0.67,end=0),
+             bw=FALSE, do.contour=FALSE, do.legend=TRUE,...) {
+ if(do.legend) layout(mat=cbind(matrix(1,5,5),rep(2,5)));
+ par(mar=c(6,5,3,2)); 
+ if(is.null(x)) x=1:ncol(A);
+ if(is.null(y)) y=1:nrow(A); 
+ nx=length(x); ny=length(y); 
+ x1=c(1.5*x[1]-0.5*x[2],1.5*x[nx]-0.5*x[nx-1]); 
+ y1=c(1.5*y[1]-0.5*y[2],1.5*y[ny]-0.5*y[ny-1]); 
+ if(bw) col=grey( (200:50)/200 ); 
+ image(list(x=x,y=y,z=t(A)),xlim=x1,ylim=rev(y1),col=col,cex.axis=1.5,cex.lab=1.5,bty="u",...);
+ abline(v=range(x1)); abline(h=range(y1)); 
+ if(do.contour) contour(x,y,t(A),nlevels=5,labcex=1.2,add=TRUE);   
+ 
+ if(do.legend) {
+    l.y=seq(min(A),max(A),length=100);  
+    par(mar=c(6,2,3,1))
+    image(list(x=1:2,y=l.y,z=rbind(l.y,l.y)),col=col,bty="o",xaxt="n",yaxt="n"); 
+    axis(side=2,cex.axis=1.5,at=pretty(seq(min(A),max(A),length=10))); 
+ } 
+}
+```
 
+```{r}
+image(IPM.est$meshpts,IPM.est$meshpts, t(IPM.est$P + IPM.est$F)^.1)
+```
+
+## Calculate projected vital rates and lambdas
+```{r}
 Re(eigen(IPM.est$K)$values[1])
-## modeled asymptotic rate of increase : 0.999
+```
+modeled asymptotic rate of increase : 0.69
 
+```{r}
 pop.size <- dat %>% 
   select(Year, log_LL_t) %>% 
   group_by(Year) %>% 
@@ -390,52 +431,5 @@ pop.size <- dat %>%
 fit.pop.growth <- lm(log(pop.size$pop.size) ~ pop.size$Year)
 
 exp(coef(fit.pop.growth)[2])
-## true finite rate of increase: 0.929
-
-meshpts <- IPM.est$meshpts
-
-## get the dominant right eigenvector w(z) (the stable distribution of size)
-w.est <- Re(eigen(IPM.est$K)$vectors[, 1])
-## scale w so that it becomes a discrete probability density
-stable.z.dist.est <- w.est/sum(w.est)
-## get the proportion of individuals in each sizeclass (i.e. each meshpoint), and then compute their means
-mean.z.est <- sum(stable.z.dist.est * meshpts)
-mean.z.est
-## 0.859
-
-## get the stable size distribution of flowering plants
-wb.est <- p_bz(meshpts, m.par.est) * w.est ## probability of flowering * stable distribution of size
-stable.flowering.dist.est <- wb.est/sum(wb.est)
-mean.flowering.z.est <- sum(stable.flowering.dist.est * meshpts)
-mean.flowering.z.est
-## 1.952
-
-dev.new(); 
-set_graph_pars("panel4")
-
-## 1 - plot population density versus time...
-
-plot(2018:2020, log(pop.size$pop.size), type = "l", xlab = "Time", ylab = "Population size")
-mod.pop.growth <- lm(log(pop.size$pop.size) ~ seq.int(2018, 2020))
-abline(mod.pop.growth, col = "blue")
-
-## ...roughly linear for log(Nt) vs time so exponential growth
-
-## 2 - plot mean size versus time...
-plot(2018:2020, pop.size$mean.size, type = "l", xlab = "Time", ylab = "Mean plant size", ylim = c(.75,1.5))
-abline(h = mean.z.est, col = "red")
-
-## ...mean size seems to settle down after a while
-
-## 3 - plot mean flowering size versus time...
-plot(1:yr, mean.fl.z.t[1:yr], type = "l", xlab = "Time", ylab = "Mean flowering plant size")
-abline(h = mean.flowering.z.true, col = "red")
-add_panel_label("c")
-
-## ...mean flowering size seems to settle down after a while
-
-## 4 - plot of density estimates at time 50 and the end
-plot(density(sim.data$z), main = "", ylim = c(0, 0.4), xlab = "Plant size")
-# lines(density(sim.data$z))
-lines(IPM.est$meshpts, stable.z.dist.est/diff(IPM.est$meshpts)[1], col = "red")
-add_panel_label("d")
+```
+true finite rate of increase: 1.01
