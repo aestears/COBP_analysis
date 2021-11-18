@@ -20,16 +20,14 @@ library(tidyverse)
 ### Functions in the IPM kernel
 For data from a pre-reproductive census, with a discrete seedling and seedbank stages 
 
-$n(z',t+1) = $
 
-**Growth:**
-$$P(z',z) = \int_{L}^{U}(1-p_b(z))s(z)G(z',z)n(z,t)dz$$
-plus ... 
+**Distribution of size of individuals in year *t+1*:**
+New recruits from the seedling stage + growth and survival kernel
+$$n(z',t+1) = S(t)p_{estab}c_o(z') + \int_{L}^{U}(1-p_b(z))s(z)G(z',z)n(z,t)dz $$
+**Size of the seedling stage:**
+$$S(t+1) = p_r\Big[\gamma B(t) + (1-\delta)\int_{L}^{U}p_b(z)b(z)n(z,t)dz\Big] $$
 
-**Fecundity:** With a time lag for flowering probability and 
-$$F(z',z) = C_0(z') \Big[p_{germ}\int_{L}^{U}p_b(z)n(z,t-1)dz+p_{SBout}B(t) \Big] $$
-
-**Seedbank:**   (after Ellner, 2016)
+**Seedbank:**  (after Ellner, 2016)
 $$B(t+1) = s_{B}\Big[(1-\gamma)B(t)+\delta\int_{L}^{U}p_b(z)b(z)n(z,t)dz \Big]$$
 
 # Load *Oenothera coloradensis* census data
@@ -48,7 +46,8 @@ dat$Num_capsules <- round(dat$Num_capsules, digits = 0)
 ```
 
 # Make vital rate models 
-### Survival
+### Survival 
+$$s(z)$$
 ```{r}
 ## subset the data to exclude flowering individuals
 survDat <- dat[dat$flowering==0 | is.na(dat$flowering),]
@@ -68,6 +67,7 @@ lines(x = newdata$log_LL_t, y = predict(object = survMod, newdata =  newdata, ty
 ```
 
 ### Growth
+$$G(z',z)$$
 ```{r}
 # ## visualize the data
 # plot(log_LL_tplus1 ~ log_LL_t, data = dat)
@@ -80,7 +80,8 @@ plot(log_LL_tplus1 ~ log_LL_t, data = dat)
 abline(sizeMod, col = "red")
 ```
 
-### Fecundity 
+### Number of seeds produced, according to plant size
+$$b(z)$$
 using size in current year (no. of seeds/plant, for those that flowered ~ size_t)
 ```{r}
  ## use only plants that flowered 
@@ -100,26 +101,12 @@ newdata <- data.frame("log_LL_t" = seq(from = min(seedDat$log_LL_t, na.rm = TRUE
 lines(x = newdata$log_LL_t, y = predict(object = seedMod_t, newdata =  newdata, type = "response"), col = "red")
 ```
 
-### Fecundity
-using size in previous year (no. of seeds/plant, for those that flowered ~ size_tminus1)
-```{r}
-## fit poisson glm (for count data)
-seedMod_tminus1 <- glm(Num_capsules ~ log_LL_tminus1, data = seedDat, family = poisson)
-summary(seedMod_tminus1)
-## plot model results
-plot(Num_capsules ~ log_LL_tminus1, data = seedDat)
-newdata <- data.frame("log_LL_tminus1" = seq(from = min(seedDat$log_LL_tminus1, na.rm = TRUE), 
-                                       to = max(seedDat$log_LL_tminus1, na.rm = TRUE),
-                                       length.out = 100))
-lines(x = newdata$log_LL_tminus1, y = predict(object = seedMod_tminus1, newdata =  newdata, type = "response"), col = "red")
-
-```
-
 ### Flowering probability
-using size in current year
+$$p_b(z)$$
+using size in current year (w/ squared term)
 ```{r}
 ## logistic glm with log-transformed size_t
-flwrMod_t <- glm(flowering ~ log_LL_t, data = dat, family = binomial)
+flwrMod_t <- glm(flowering ~ log_LL_t + I(log_LL_t^2), data = dat, family = binomial)
 summary(flwrMod_t)
 ## plot model results 
 plot(flowering ~ log_LL_t, data = dat)
@@ -129,25 +116,8 @@ newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE),
 lines(x = newdata$log_LL_t, y = predict(object = flwrMod_t, newdata =  newdata, type = "response"), col = "red")
 ```
 
-### Flowering probability
-using size in previous year
-```{r}
-
-## visualize the data
-plot(flowering ~ log_LL_tminus1, data = dat)
-
-## logistic glm with log-transformed size_t
-flwrMod_tminus1 <- glm(flowering ~ log_LL_tminus1, data = dat, family = binomial)
-summary(flwrMod_tminus1)
-## plot model results 
-plot(flowering ~ log_LL_tminus1, data = dat)
-newdata <- data.frame("log_LL_tminus1" = seq(from = min(dat$log_LL_tminus1, na.rm = TRUE), 
-                                       to = max(dat$log_LL_tminus1, na.rm = TRUE),
-                                       length.out = 100))
-lines(x = newdata$log_LL_tminus1, y = predict(object = flwrMod_tminus1, newdata =  newdata, type = "response"), col = "red")
-```
-
-### Distribution of recruit size
+### Distribution of recruit size 
+$$c_o(z')$$
 ```{r}
 ## subset the data
 recD <- dat[dat$age == 0 & is.na(dat$age) == FALSE,]
@@ -159,45 +129,75 @@ hist(recD$log_LL_t)
 abline(v = recMod$coefficients, col = "blue", lwd = 2)
 ```
 
-### Probability of establishment (and surviving through the seedbank stage)
+### Probability of a seedling in year *t* establishing to a rosette in year *t+1*
+$$p_{estab}$$
 ```{r message=FALSE}
-## make a column in 'dat' that labels recruits
+## make a column in 'dat' that labels 'recruits' to the rosette stage
 dat$recruit <- 0
 dat[dat$age==0 & is.na(dat$age)==FALSE,"recruit"] <- 1
 ## get the number of recruits/year 
 estabTemp <- dat %>% 
-  select(Plot_ID, Year, Num_capsules, seedling, recruit) %>% 
+  select(Plot_ID, Year, recruit) %>% 
   group_by(Plot_ID, Year) %>% 
-  summarize(seeds = sum(Num_capsules, na.rm = TRUE), recruits = sum(recruit)) %>% 
-  rename(seeds_t = seeds, recruits_t = recruits) 
+  summarize( recruits = sum(recruit)) %>% 
+  rename( recruits_t = recruits)
+  
+## change the 2018 recruit values to NA, since we don't have a count of recruits to the rosette stage for that year
+estabTemp[estabTemp$Year==2018, "recruits_t"] <- NA
+## get the number of recruits in year t+1
+estabTemp$Year <- estabTemp$Year - 1
+names(estabTemp)[3] <- "recruits_tplus1"
 
-## get the no.of seeds/year
-seedsTemp <- estabTemp %>% 
-  select(Plot_ID, Year, seeds_t)
+## get the no.of seedlings/year
+## load the seedling data
+seedlings <- read.csv("../Raw Data/COBP_seedlings_8_23_21.csv") %>% 
+  select(Plot_ID, Seedlings_18, Seedlings_19, Seedlings_20) %>% 
+  group_by(Plot_ID) %>% 
+  summarize(Seedlings_18 = sum(Seedlings_18), Seedlings_19 = sum(Seedlings_19), Seedlings_20 = sum(Seedlings_20)) %>% 
+  pivot_longer(cols = c(Seedlings_18, Seedlings_19, Seedlings_20), names_to = "Year", values_to = "Seedlings_t", names_pattern = "([[:digit:]]+)") %>% 
+  mutate(Year = (as.numeric(Year) + 2000))
 
-## get the no. of recruits/year t-2 (since we're including the seedling stage in this step)
-recsTemp <- estabTemp %>% 
-  select(Plot_ID, Year, recruits_t) %>% 
-  rename(recruits_tplus1 = recruits_t) %>% 
-  mutate(Year = Year - 2)
+## combine seedling and rosette recruit data
+estabs <- left_join(estabTemp, seedlings)
 
-estabs <- left_join(seedsTemp, recsTemp)
+## increase the number of seedlings by 10% (to conservatively account for missed seedlings or ones that germinated later in the year)
+#estabs$Seedlings_t <- round(1.10 * estabs$Seedlings_t,0)
+## calculate the probability of seedling in year t establishing to a rosette in year t+1
+estabs$P_estab <- estabs$recruits_tplus1/estabs$Seedlings_t
 
-## calculate the 
-temp <- estabs$recruits_tplus1/estabs$seeds_t
-temp[is.infinite(temp)] <- NA
-(p.r.est <- mean(temp, na.rm = TRUE))
+estabs[is.infinite(estabs$P_estab),"P_estab"] <- NA
+## if the value is >1, round back to one (must have missed some seedlings)
+estabs[estabs$P_estab > 1 & is.na(estabs$P_estab) == FALSE,"P_estab"] <- 1
+
+estabs <- as.data.frame(estabs)
+p.estab.est <- sum(estabs$P_estab, na.rm = TRUE)/sum(is.na(estabs$P_estab)==FALSE)
 ```
 
-### Probability of a seed produced by an adult plant in year t will germinate in year t+1 (i.e. skipping the seedbank) (Pgerm)
+### Probability of a seed produced by an adult plant in year t will enter the seedbank
+$$\delta$$
 
-### Probability of a seed produced by an adult plant in year t will enter the seedbank in year t+1 (PgoSB)
+```{r}
+delta.est <- .5
+```
 
-###Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 (PSBout)
+### Probability that non-seedbank seeds will germinate into seedlings in year t+1
+$$p_r$$
+```{r}
+p.r.est <- .5
+```
 
-### Probability that a seed in the seedbank in year t will stay in the seedbank as a viable seed in year t+1 (PSBstay)
+### Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
+$$\gamma$$
+```{r}
+gamma.est <- .5
+```
 
-## Note: Vital rates #1 and #2, and #3 and #4 do not need to sum to 1. The remainder of each of these pairs accounts for seed mortality between years.  
+
+### Probability that a seed in the seedbank in year t will survive and be in the seedbank in year t+1 
+$$s_b$$
+```{r}
+s.b.est <- .5
+```
 
 
 ## Implement the IPM 
@@ -224,12 +224,11 @@ s_z <- function(z, m.par)
 }
 ```
 
-
 ### Probability of flowering function, logistic regression
 ```{r}
 p_bz <- function(z, m.par)
 {
-  linear.p <- m.par["flow.int"] + m.par["flow.z"] * z      # linear predictor
+  linear.p <- m.par["flow.int"] + m.par["flow.z"] * z  + m.par["flow.z.sq"]*z^2     # linear predictor
   p <- 1/(1+exp(-linear.p))                                # logistic transformation to probability
   return(p)
 }
@@ -255,7 +254,269 @@ c_0z1 <- function(z1, m.par)
 }
 ```
 
-### Define the survival kernel
+Look at ipmr functions to figure out what to do next
+```{r}
+library(ipmr)
+
+# Set up the initial population conditions and parameters (example w/ only one discrete stage and dummy seedbank rates)
+data_list <- list(
+  g_int     = coef(sizeMod)[1],
+  g_slope   = coef(sizeMod)[2],
+  g_sd      = summary(sizeMod)$sigma,
+  s_int     = coef(survMod)[1],
+  s_slope   = coef(survMod)[2],
+  p_b_int   = coef(flwrMod_t)[1], #probability of flowering
+  p_b_slope = coef(flwrMod_t)[2],
+  p_b_slope_2 = coef(flwrMod_t)[3],
+  b_int   = coef(seedMod_t)[1], #seed production
+  b_slope = coef(seedMod_t)[2],
+  c_o_mu    = coef(recMod), #recruit size distribution
+  c_o_sd    = summary(recMod)$sigma,
+  p_r   = p.r.est, # Probability that non-seedbank seeds will germinate into seedlings in year t+1
+  gamma = gamma.est, # Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
+  delta = delta.est, # probability that a seed produced by an adult plant in year t will enter the seedbank
+  s_b = s.b.est, # probability that a seed in the seedbank in year t will survive and be in the seedbank in year t+1
+  p_estab = p.estab.est # probability that a seedling will establish into a rosette in t+1
+)
+
+## Next, we set up two functions to pass into the model. These perform the inverse logit transformations for the probability of flowering model (r_r/𝑟𝑟(𝑧)).
+
+# We'll set up some helper functions. The survival function
+# in this model is a quadratic function, so we use an additional inverse logit function
+# that can handle the quadratic term.
+
+inv_logit <- function(int, slope, sv) {
+  1/(1 + exp(-(int + slope * sv)))
+}
+
+inv_logit_2 <- function(int, slope, slope_2, sv) {
+  1/(1 + exp(-(int + slope * sv + slope_2 * sv ^ 2)))
+}
+## Now, we’re ready to begin making the IPM kernels. We change the sim_gen argument of init_ipm() to "general".
+
+general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
+                        di_dd = "di", # make it density independent
+                        det_stoch = "det") %>% # make it deterministic
+  define_kernel(
+    name          = "P",
+    
+    # We add d_ht to formula to make sure integration is handled correctly.
+    # This variable is generated internally by make_ipm(), so we don't need
+    # to do anything else.
+    
+    formula       = (1-p_b.) * s. * g. * d_ht,
+    
+    
+    family        = "CC",
+    
+    
+    g.             = dnorm(ht_2, g_mu, g_sd),
+    g_mu          = g_int + g_slope * ht_1,
+    s.             = inv_logit(s_int, s_slope, ht_1),
+    p_b.          = inv_logit_2(p_b_int, p_b_slope, p_b_slope_2, ht_1),
+    data_list     = data_list,
+    states        = list(c('ht')),
+    uses_par_sets = FALSE,
+    evict_cor     = FALSE
+    #evict_fun     = truncated_distributions('norm', 'g')
+) %>%
+  define_kernel(
+    name          = "leave_seedlings", ## leave seedling stage and go to rosette stage
+    formula       = p_estab. * c_o. * d_ht,
+    
+    # Note that now, family = "DC" because it denotes a discrete -> continuous transition
+    
+    family        = 'DC',
+    p_estab.      = p_estab,
+    c_o.          = dnorm(ht_2, c_o_mu, c_o_sd),
+    data_list     = data_list,
+    
+    # Note that here, we add "s" to our list in states, because this kernel uses seedlings 
+    
+    states        = list(c('ht', "s")),
+    uses_par_sets = FALSE,
+    evict_cor     = FALSE
+    #evict_fun     = truncated_distributions('norm','g')
+) %>%
+  define_kernel(
+    name    = "repro_to_seedlings",
+   
+    formula       = (p_r. * (1-delta.)) * (p_b. * b. * d_ht),
+    
+    # The family argument tells ipmr what kind of transition this kernel describes.
+    # it can be "CC" for continuous -> continuous, "DC" for discrete -> continuous
+    # "CD" for continuous -> discrete, or "DD" for discrete -> discrete.
+    
+    family        = "CD",
+    
+    p_r.          = p_r,
+    delta.        = delta,
+    p_b.          = inv_logit_2(p_b_int, p_b_slope, p_b_slope_2, ht_1),
+    b.            = exp(b_int + b_slope * ht_1),
+    data_list     = data_list,
+    states        = list(c('ht', 's')),
+    uses_par_sets = FALSE,
+    evict_cor     = FALSE
+    #evict_fun     = truncated_distributions('norm', 'g')
+
+) %>%
+  define_kernel(
+    
+    name          = 'seedbank_to_seedlings',
+    
+    formula       = p_r. * gamma.,
+    
+    # Note that now, family = "DC" because it denotes a discrete -> continuous transition
+    
+    family        = 'DD',
+    p_r.          = p_r, 
+    gamma.        = gamma,
+    p_estab       = p_estab,
+    data_list     = data_list,
+    
+    # Note that here, we add "s" to our list in states, because this kernel uses seedlings, and 'b', since this kernel using the seedbank stage
+    
+    states        = list(c('b', 's')),
+    uses_par_sets = FALSE
+    
+  ) %>%
+  define_kernel(
+    name    = "stay_seedbank",
+   
+    formula       = (1 - gamma.) * s_b. ,
+    
+    # The family argument tells ipmr what kind of transition this kernel describes.
+    # it can be "CC" for continuous -> continuous, "DC" for discrete -> continuous
+    # "CD" for continuous -> discrete, or "DD" for discrete -> discrete.
+    
+    family        = "DD",
+    
+    gamma.        = gamma,
+    s_b.          = s_b,
+    data_list     = data_list,
+    states        = list(c('b')),
+    uses_par_sets = FALSE
+    
+  ) %>%
+  define_kernel(
+    
+    name          = 'repro_to_seedbank',
+    
+    formula       = (s_b. * delta.) * (p_b. * b. * d_ht),
+    
+    family        = 'CD',
+    s_b.          = s_b, 
+    delta.        = delta,
+    p_b.          = inv_logit_2(p_b_int, p_b_slope, p_b_slope_2, ht_1),
+    b.            = exp(b_int + b_slope * ht_1),
+    data_list     = data_list,
+    
+    # Note that here, we add "s" to our list in states, because this kernel uses seedlings, and 'b', since this kernel using the seedbank stage
+    
+    states        = list(c('b', 'ht')),
+    uses_par_sets = FALSE,
+    evict_cor     = FALSE
+    #evict_fun     = truncated_distributions(fun = 'norm', target = 'p_b')
+) 
+## We’ve now defined all of the kernels, next are the implementation details. These also differ somewhat from simple IPMs. The key difference in the implementation arguments list lies in the state_start and state_end of each kernel, and is related to the family argument of each kernel. Kernels that begin with one state and end in a different state (e.g. moving from seed bank to a plant) will have different entries in the state_start and state_end slots. It is very important to get these correct, as ipmr uses this information to generate the model iteration procedure automatically (i.e. code corresponding to Equations 1-2).
+
+# general_ipm <- general_ipm %>%
+#   define_impl(
+#     list(
+#       P                     = list(int_rule    = "midpoint",
+#                                    state_start = "ht",
+#                                    state_end   = "ht"),
+#       leave_seedlings       = list(int_rule    = "midpoint",
+#                                    state_start = "s",
+#                                    state_end   = "ht"),
+#       repro_to_seedlings    = list(int_rule    = "midpoint",
+#                                    state_start = "ht",
+#                                    state_end   = "s"),
+#       seedbank_to_seedlings = list(int_rule    = "midpoint",
+#                                    state_start = "b",
+#                                    state_end   = "s"),
+#       stay_seedbank         = list(int_rule    = "midpoint",
+#                                    state_start = "b",
+#                                    state_end   = "b"),
+#       repro_to_seedbank     = list(int_rule    = "midpoint",
+#                                    state_start = "ht",
+#                                    state_end   = "b")
+#       )
+#     )
+
+## alternative method
+general_ipm <- general_ipm %>%
+  define_impl(
+    make_impl_args_list(
+      kernel_names = c("P", "leave_seedlings", "repro_to_seedlings", "seedbank_to_seedlings", "stay_seedbank", "repro_to_seedbank"),
+      int_rule     = c(rep("midpoint", 6)),
+      state_start    = c('ht', "s", "ht", "b", "b", "ht"),
+      state_end      = c("ht", "ht", "s", "s", "b", "b")
+    )
+  )
+```
+Actually run the IPM!
+```{r}
+# lower limit of size
+L <- 1.09
+# upper limit of size
+U <- 3.66
+
+n <- 500
+
+set.seed(2312)
+
+init_pop_vec   <- runif(500)
+
+init_seed_bank <- 20
+
+init_seedlings <- round(sum(seedlings$Seedlings_t)/length(seedlings$Seedlings_t),0)
+
+general_ipm <- general_ipm %>%
+  define_domains(
+    
+    # We can pass the variables we created above into define_domains
+    
+    ht = c(L, U, n)
+    
+  ) %>%
+  define_pop_state(
+    
+    # We can also pass them into define_pop_state
+    
+    pop_vectors = list(
+      n_ht = init_pop_vec,
+      n_b  = init_seed_bank,
+      n_s  = init_seedlings 
+    )
+  ) %>%
+  make_ipm(iterations = 100,
+           usr_funs = list(inv_logit   = inv_logit,
+                           inv_logit_2 = inv_logit_2))
+
+
+# lambda is a generic function to compute per-capita growth rates. It has a number
+# of different options depending on the type of model
+
+lambda(general_ipm)
+
+# If we are worried about whether or not the model converged to stable
+# dynamics, we can use the exported utility is_conv_to_asymptotic. The default
+# tolerance for convergence is 1e-10, but can be changed with the 'tol' argument.
+
+is_conv_to_asymptotic(general_ipm, tol = 1e-10)
+
+w <- right_ev(general_ipm)
+v <- left_ev(general_ipm)
+```
+
+
+
+**Distribution of size of individuals in year *t+1*:**
+New recruits from the seedling stage + growth and survival kernel
+$$n(z',t+1) = S(t)p_{estab}c_o(z') + \int_{L}^{U}(1-p_b(z))s(z)G(z',z)n(z,t)dz $$
+
+### Define the growth/survival kernel
 ```{r}
 P_z1z <- function (z1, z, m.par) {
   
@@ -264,11 +525,27 @@ P_z1z <- function (z1, z, m.par) {
 }
 ```
 
+### Define the function for new recruits from the seedling stage
+```{r}
+#??? but this isn't an integral? what to do about this??
+NewRosette_fxn <-  function (z1, s, m.par) {
+  #z1 size of new rosette in year t+1
+  #s size of the seedbank at size t
+  # list of model parameters
+  return( )
+}
+```
+
+**Size of the seedling stage:**
+$$S(t+1) = p_r\Big[\gamma B(t) + (1-\delta)\int_{L}^{U}p_b(z)b(z)n(z,t)dz\Big] $$
+
+**Seedbank:**  (after Ellner, 2016)
+$$B(t+1) = s_{B}\Big[(1-\gamma)B(t)+\delta\int_{L}^{U}p_b(z)b(z)n(z,t)dz \Big]$$
 ### Define the fecundity kernel
 ```{r}
 F_z1z <- function (z1, z, m.par) {
   
-  return( p_bz(z, m.par) * b_z(z, m.par) * m.par["p.r"] * c_0z1(z1, m.par))
+  return( p_bz(z, m.par) * b_z(z, m.par) * m.par["p.estab"] * c_0z1(z1, m.par))
   
 }
 ```
@@ -322,7 +599,7 @@ get_mean_var_Repr <- function(init.z,n.samp) {
     num.Repr <- sum(Repr)
     
     if(num.Repr>0) {
-      Seeds <- rpois(num.Repr, m.par.true["p.r"] * b_z(z[Repr==1],m.par.true))
+      Seeds <- rpois(num.Repr, m.par.true["p.estab"] * b_z(z[Repr==1],m.par.true))
       Repr.out <- c(Repr.out,Seeds)
     }
     
@@ -368,19 +645,23 @@ m.par.est <- c(surv = coef(survMod),
                rcsz = coef(recMod),
                rcsz.sd = summary(recMod)$sigma,
                seed = coef(seedMod_t),
-               p.r = p.r.est
+               p.estab = p.estab.est,
+               delta = delta.est,
+               p.r = p.r.est,
+               gamma = gamma.est,
+               s.b = s.b.est
                )
-names(m.par.est) <- c("surv.int", "surv.z", "flow.int", "flow.z",  "grow.int", "grow.z",   "grow.sd" , "rcsz.int", "rcsz.sd" , "seed.int", "seed.z"  , "p.r"   )  
+names(m.par.est) <- c("surv.int", "surv.z", "flow.int", "flow.z", "flow.z.sq" , "grow.int", "grow.z",   "grow.sd" , "rcsz.int", "rcsz.sd" , "seed.int", "seed.z"  , "p.estab", "delta", "p.r", "gamma", "s.b")  
 
 ## prepare the matrix
 nBigMatrix <- 250
-min.size <- with(dat, min(log_LL_t, na.rm = TRUE))
-min.size
+#min.size <- with(dat, min(log_LL_t, na.rm = TRUE))
+min.size <- 1.098612
 max.size <- with(dat, max(log_LL_t, na.rm = TRUE))
 max.size
 
 ## fit the IPM
-IPM.est <- mk_K(nBigMatrix, m.par.est, -3, 4)
+IPM.est <- mk_K(nBigMatrix, m.par.est, min.size, max.size)
 
 ## cube the K matrix?
 IPM.cube <- (IPM.est$K)^3
@@ -414,6 +695,8 @@ matrix.image=function(A, x=NULL, y=NULL, col=rainbow(100,start=0.67,end=0),
 
 ```{r}
 image(IPM.est$meshpts,IPM.est$meshpts, t(IPM.est$P + IPM.est$F)^.1)
+
+image(IPM.est$meshpts,IPM.est$meshpts, t(IPM.est$F)^.1)
 ```
 
 ## Calculate projected vital rates and lambdas
