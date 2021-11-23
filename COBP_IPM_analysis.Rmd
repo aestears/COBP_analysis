@@ -23,12 +23,12 @@ For data from a pre-reproductive census, with a discrete seedling and seedbank s
 
 **Distribution of size of individuals in year *t+1*:**
 New recruits from the seedling stage + growth and survival kernel
-$$n(z',t+1) = S(t)p_{estab}c_o(z') + \int_{L}^{U}(1-p_b(z))s(z)G(z',z)n(z,t)dz $$
+$$n(z',t+1) = S(t)p_{estab}c_o(z') + \int_{L}^{U}(1-P_b(z))s(z)G(z',z)n(z,t)dz $$
 **Size of the seedling stage:**
-$$S(t+1) = p_r\Big[\gamma B(t) + (1-\delta)\int_{L}^{U}p_b(z)b(z)n(z,t)dz\Big] $$
+$$S(t+1) = B(t)outSB + goSdlng\int_{L}^{U}P_b(z)b(z)n(z,t)dz $$
 
 **Seedbank:**  (after Ellner, 2016)
-$$B(t+1) = s_{B}\Big[(1-\gamma)B(t)+\delta\int_{L}^{U}p_b(z)b(z)n(z,t)dz \Big]$$
+$$B(t+1) = B(t)staySB+goSB\int_{L}^{U}P_b(z)b(z)n(z,t)dz $$
 
 # Load *Oenothera coloradensis* census data
 ```{r}
@@ -71,13 +71,79 @@ dat_3 <- plantTracker::getNeighbors(dat = dat_2, buff = 15, method = "count", co
 ## rename column to indicate radius
 names(dat_3)[6] <-"neighbors_15"
 
-dat <- dat_3
+## calculate neighbors w/in a 20 cm radius
+dat_4 <- plantTracker::getNeighbors(dat = dat_3, buff = 20, method = "count", compType = "oneSpp", quad = "Plot_ID")
+## rename column to indicate radius
+names(dat_4)[6] <-"neighbors_20"
+
+## calculate neighbors w/in a 40 cm radius
+dat_5 <- plantTracker::getNeighbors(dat = dat_4, buff = 40, method = "count", compType = "oneSpp", quad = "Plot_ID")
+## rename column to indicate radius
+names(dat_5)[6] <-"neighbors_40"
+
+## calculate neighbors w/in a 60 cm radius
+dat_6 <- plantTracker::getNeighbors(dat = dat_5, buff = 60, method = "count", compType = "oneSpp", quad = "Plot_ID")
+## rename column to indicate radius
+names(dat_6)[6] <-"neighbors_60"
+
+## calculate neighbors w/in a 100 cm radius
+dat_7 <- plantTracker::getNeighbors(dat = dat_6, buff = 100, method = "count", compType = "oneSpp", quad = "Plot_ID")
+## rename column to indicate radius
+names(dat_7)[6] <-"neighbors_100"
+
+dat <- dat_7
 ```
 
 Figure out which neighborhood radius makes the most sense, i.e. explains the most variation in growth and survival
 ```{r}
-
+## growth models for each radius
+neighMod_5 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_5, data = dat)
+summary(neighMod_5)
+neighMod_10 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_10, data = dat)
+summary(neighMod_10)
+neighMod_15 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_15, data = dat)
+summary(neighMod_15)
+neighMod_20 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_20, data = dat)
+summary(neighMod_20)
+neighMod_40 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_40, data = dat)
+summary(neighMod_40)
+neighMod_60 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_60, data = dat)
+summary(neighMod_60)
+neighMod_100 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_100, data = dat)
+summary(neighMod_100)
 ```
+
+Then, visually compare models
+```{r}
+plot(log_LL_tplus1 ~ log_LL_t, data = dat)
+abline(lm(log_LL_tplus1 ~ log_LL_t, data = dat), col = "red") # add model w/out neighbor term
+#make data for predictions
+newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE), 
+               to = max(dat$log_LL_t, na.rm = TRUE),
+               length.out = 100), "neighbors_5" = mean(dat$neighbors_5), "neighbors_10" = mean(dat$neighbors_10), "neighbors_15" = mean(dat$neighbors_15), "neighbors_20" = mean(dat$neighbors_20), "neighbors_40" = mean(dat$neighbors_40))
+lines(x = newdata$log_LL_t, y = predict(object = neighMod_5, newdata =  newdata), col = "blue")
+lines(x = newdata$log_LL_t, y = predict(object = neighMod_10, newdata =  newdata), col = "green")
+lines(x = newdata$log_LL_t, y = predict(object = neighMod_15, newdata =  newdata), col = "orange")
+lines(x = newdata$log_LL_t, y = predict(object = neighMod_20, newdata =  newdata), col = "pink")
+lines(x = newdata$log_LL_t, y = predict(object = neighMod_40, newdata =  newdata), col = "purple")
+#abline(a = coef(neighMod_5)[1], b = coef(neighMod_5)[2], col = "blue")
+#abline(a = coef(neighMod_10)[1], b = coef(neighMod_10)[2], col = "green")
+#abline(a = coef(neighMod_15)[1], b = coef(neighMod_15)[2], col = "orange")
+abline(a = 0, b = 1, col = "darkgrey", lty = 2) ## add a 1:1 line
+```
+
+Now, compare the models using AIC
+```{r}
+AIC(lm(log_LL_tplus1 ~ log_LL_t, data = dat), neighMod_5, neighMod_10, neighMod_15, neighMod_20, neighMod_40, neighMod_60, neighMod_100)
+
+## plot the decline in AIC with radius
+plot(x =c(0,5,10,15,20,40,60,100), y = c(3186.305,3115.361,3046.081,3019.100, 3002.569, 2946.028, 2935.554, 2924.782), type = "l")
+
+## plot the change in effect size w/ size of radius
+plot(x =c(0,5,10,15,20,40,60,100), y = c(NA, coef(neighMod_5)[3], coef(neighMod_10)[3], coef(neighMod_15)[3], coef(neighMod_20)[3], coef(neighMod_40)[3], coef(neighMod_60)[3], coef(neighMod_100)[3]), type = "l")
+```
+
+Maybe use neighbors_20? (since the AIC decreases, but the effect size is smaller)
 
 
 ## other potential covariates from the data
@@ -94,13 +160,13 @@ survDat <- dat[dat$flowering==0 | is.na(dat$flowering),]
 # plot(survives_tplus1 ~ log_LL_t, data = survDat)
 
 ## logistic glm with log-transformed size_t
-survMod <- glm(survives_tplus1 ~ log_LL_t, data = survDat, family = binomial)
+survMod <- glm(survives_tplus1 ~ log_LL_t , data = survDat, family = binomial)
 summary(survMod)
 ## plot model results 
 plot(survives_tplus1 ~ log_LL_t, data = survDat)
 newdata <- data.frame("log_LL_t" = seq(from = min(survDat$log_LL_t, na.rm = TRUE), 
                to = max(survDat$log_LL_t, na.rm = TRUE),
-               length.out = 100))
+               length.out = 100), "neighbors_20" = mean(survDat$neighbors_20))
 lines(x = newdata$log_LL_t, y = predict(object = survMod, newdata =  newdata, type = "response"), col = "red")
 ```
 
@@ -115,7 +181,10 @@ sizeMod <- lm(log_LL_tplus1 ~ log_LL_t , data = dat)
 summary(sizeMod)
 ## plot model results
 plot(log_LL_tplus1 ~ log_LL_t, data = dat)
-abline(sizeMod, col = "red")
+newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE), 
+               to = max(dat$log_LL_t, na.rm = TRUE),
+               length.out = 100), "neighbors_20" = mean(dat$neighbors_20))
+lines(x = newdata$log_LL_t, y = predict(object = sizeMod, newdata =  newdata), col = "red")
 ```
 
 ### Number of seeds produced, according to plant size
@@ -129,13 +198,13 @@ using size in current year (no. of seeds/plant, for those that flowered ~ size_t
 # plot(Num_capsules ~ log_LL_t, data = seedDat)
 
 ## fit poisson glm (for count data)
-seedMod_t <- glm(Num_capsules ~ log_LL_t, data = seedDat, family = poisson)
+seedMod_t <- glm(Num_capsules ~ log_LL_t , data = seedDat, family = poisson)
 summary(seedMod_t)
 ## plot model results
 plot(Num_capsules ~ log_LL_t, data = seedDat)
 newdata <- data.frame("log_LL_t" = seq(from = min(seedDat$log_LL_t, na.rm = TRUE), 
                                        to = max(seedDat$log_LL_t, na.rm = TRUE),
-                                       length.out = 100))
+                                       length.out = 100), "neighbors_20" = mean(seedDat$neighbors_20))
 lines(x = newdata$log_LL_t, y = predict(object = seedMod_t, newdata =  newdata, type = "response"), col = "red")
 ```
 
@@ -144,13 +213,13 @@ $$p_b(z)$$
 using size in current year (w/ squared term)
 ```{r}
 ## logistic glm with log-transformed size_t
-flwrMod_t <- glm(flowering ~ log_LL_t + I(log_LL_t^2), data = dat, family = binomial)
+flwrMod_t <- glm(flowering ~ log_LL_t + I(log_LL_t^2) , data = dat, family = binomial)
 summary(flwrMod_t)
 ## plot model results 
 plot(flowering ~ log_LL_t, data = dat)
 newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE), 
                                        to = max(dat$log_LL_t, na.rm = TRUE),
-                                       length.out = 100))
+                                       length.out = 100), "neighbors_20" = mean(seedDat$neighbors_20))
 lines(x = newdata$log_LL_t, y = predict(object = flwrMod_t, newdata =  newdata, type = "response"), col = "red")
 ```
 
@@ -175,7 +244,7 @@ dat$recruit <- 0
 dat[dat$age==0 & is.na(dat$age)==FALSE,"recruit"] <- 1
 ## get the number of recruits/year 
 estabTemp <- dat %>% 
-  select(Plot_ID, Year, recruit) %>% 
+  dplyr::select(Plot_ID, Year, recruit) %>% 
   group_by(Plot_ID, Year) %>% 
   summarize( recruits = sum(recruit)) %>% 
   rename( recruits_t = recruits)
@@ -189,7 +258,7 @@ names(estabTemp)[3] <- "recruits_tplus1"
 ## get the no.of seedlings/year
 ## load the seedling data
 seedlings <- read.csv("../Raw Data/COBP_seedlings_8_23_21.csv") %>% 
-  select(Plot_ID, Seedlings_18, Seedlings_19, Seedlings_20) %>% 
+  dplyr::select(Plot_ID, Seedlings_18, Seedlings_19, Seedlings_20) %>% 
   group_by(Plot_ID) %>% 
   summarize(Seedlings_18 = sum(Seedlings_18), Seedlings_19 = sum(Seedlings_19), Seedlings_20 = sum(Seedlings_20)) %>% 
   pivot_longer(cols = c(Seedlings_18, Seedlings_19, Seedlings_20), names_to = "Year", values_to = "Seedlings_t", names_pattern = "([[:digit:]]+)") %>% 
@@ -211,32 +280,30 @@ estabs <- as.data.frame(estabs)
 p.estab.est <- sum(estabs$P_estab, na.rm = TRUE)/sum(is.na(estabs$P_estab)==FALSE)
 ```
 
-### Probability of a seed produced by an adult plant in year t will enter the seedbank
-$$\delta$$
-
+### Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1
+$$outSB$$
 ```{r}
-delta.est <- .5
+outSB.est <- .4
 ```
 
-### Probability that non-seedbank seeds will germinate into seedlings in year t+1
-$$p_r$$
+### Probability that a seed from the seedbank in year t will stay in teh seedbank in year t+1
+$$staySB$$
 ```{r}
-p.r.est <- .5
-```
-
-### Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
-$$\gamma$$
-```{r}
-gamma.est <- .5
+staySB.est <- .4
 ```
 
 
-### Probability that a seed in the seedbank in year t will survive and be in the seedbank in year t+1 
-$$s_b$$
+### Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1
+$$goSB$$
 ```{r}
-s.b.est <- .5
+goSB.est <- .4
 ```
 
+### Probability that a seed from a plant in year t will go directly to the seedling stage
+$$goSdlng$$
+```{r}
+goSdlng.est <- .4
+```
 
 ## Implement the IPM 
 use ipmr to fit the IPM
@@ -257,10 +324,10 @@ data_list <- list(
   b_slope = coef(seedMod_t)[2],
   c_o_mu    = coef(recMod), #recruit size distribution
   c_o_sd    = summary(recMod)$sigma,
-  p_r   = p.r.est, # Probability that non-seedbank seeds will germinate into seedlings in year t+1
-  gamma = gamma.est, # Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
-  delta = delta.est, # probability that a seed produced by an adult plant in year t will enter the seedbank
-  s_b = s.b.est, # probability that a seed in the seedbank in year t will survive and be in the seedbank in year t+1
+  goSdlng   = goSdlng.est, # Probability that non-seedbank seeds will germinate into seedlings in year t+1
+  staySB = staySB.est, # Probability that a seed in the seedbank in year t will exit the seedbank in year t+1 
+  goSB = goSB.est, # probability that a seed produced by an adult plant in year t will enter the seedbank
+  outSB = outSB.est, # probability that a seedbank seed will germinate to a seedling in year t+1
   p_estab = p.estab.est # probability that a seedling will establish into a rosette in t+1
 )
 
@@ -307,7 +374,7 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
 ) %>%
   define_kernel(
     name          = "leave_seedlings", ## leave seedling stage and go to rosette stage
-    formula       = p_estab. * c_o. ,
+    formula       = p_estab. * c_o. * d_ht,
     
     # Note that now, family = "DC" because it denotes a discrete -> continuous transition
     
@@ -326,7 +393,7 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
   define_kernel(
     name    = "repro_to_seedlings",
    
-    formula       = (p_r. * (1-delta.)) * (p_b. * b. * d_ht),
+    formula       = (goSdlng) * (p_b. * b. * d_ht),
     
     # The family argument tells ipmr what kind of transition this kernel describes.
     # it can be "CC" for continuous -> continuous, "DC" for discrete -> continuous
@@ -334,8 +401,7 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
     
     family        = "CD",
     
-    p_r.          = p_r,
-    delta.        = delta,
+    goSdlng.          = goSdlng.,
     p_b.          = inv_logit_2(p_b_int, p_b_slope, p_b_slope_2, ht_1),
     b.            = exp(b_int + b_slope * ht_1),
     data_list     = data_list,
@@ -349,14 +415,12 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
     
     name          = 'seedbank_to_seedlings',
     
-    formula       = p_r. * gamma.,
+    formula       =outSB.,
     
     # Note that now, family = "DC" because it denotes a discrete -> continuous transition
     
     family        = 'DD',
-    p_r.          = p_r, 
-    gamma.        = gamma,
-    p_estab       = p_estab,
+    outSB.        = outSB,
     data_list     = data_list,
     
     # Note that here, we add "s" to our list in states, because this kernel uses seedlings, and 'b', since this kernel using the seedbank stage
@@ -368,16 +432,14 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
   define_kernel(
     name    = "stay_seedbank",
    
-    formula       = (1 - gamma.) * s_b. ,
+    formula       = staySB.,
     
     # The family argument tells ipmr what kind of transition this kernel describes.
     # it can be "CC" for continuous -> continuous, "DC" for discrete -> continuous
     # "CD" for continuous -> discrete, or "DD" for discrete -> discrete.
     
     family        = "DD",
-    
-    gamma.        = gamma,
-    s_b.          = s_b,
+    staySB.        = staySB,
     data_list     = data_list,
     states        = list(c('b')),
     uses_par_sets = FALSE
@@ -387,11 +449,10 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
     
     name          = 'repro_to_seedbank',
     
-    formula       = (s_b. * delta.) * (p_b. * b. * d_ht),
+    formula       = (goSB.) * (p_b. * b. * d_ht),
     
     family        = 'CD',
-    s_b.          = s_b, 
-    delta.        = delta,
+    goSB.          = goSB, 
     p_b.          = inv_logit_2(p_b_int, p_b_slope, p_b_slope_2, ht_1),
     b.            = exp(b_int + b_slope * ht_1),
     data_list     = data_list,
@@ -446,7 +507,7 @@ Actually run the IPM!
 L <- 1.09
 # upper limit of size
 U <- 3.66
-
+# number of break-points
 n <- 500
 
 set.seed(2312)
@@ -462,7 +523,9 @@ general_ipm <- general_ipm %>%
     
     # We can pass the variables we created above into define_domains
     
-    ht = c(L, U, n)
+    ht = c(L, U, n),
+    #s = c(0, 1000, n),
+    #b = c(0, 1000, n)
     
   ) %>%
   define_pop_state(
@@ -496,14 +559,13 @@ lambda_ipmr <- lambda(general_ipm)
 repro_value <- left_ev(general_ipm)
 stable_dist <- right_ev(general_ipm)
 ```
-
-
 ### Visualize the IPM kernel
 ```{r}
 ## make an image of the IPM
 ## first have to make a mega-kernel?
 mega_mat <- make_iter_kernel(ipm = general_ipm, 
-                             mega_mat = c(seedbank_to_seedlings, repro_to_seedlings, stay_seedbank, repro_to_seedbank,  leave_seedlings, P))
+                             mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P)
+                               )
 
 Re(eigen(mega_mat[[1]])$values[1]) - lambda(general_ipm)
 
@@ -531,5 +593,31 @@ plot(x = meshpts,
 )
 
 image(t(K)^.1)
+```
+
+
+```{r}
+#try using IPMpack
+#devtools::install_github("cran/IPMpack")
+library(IPMpack)
+
+## make sure data is in the correct format for IPMpack
+datP <- dat
+datP$size <- datP$log_LL_t
+datP$sizeNext <- datP$log_LL_tplus1
+datP$surv <- datP$survives_tplus1
+datP$fec1 <- datP$flowering # probability of reproducing
+datP$fec2 <- datP$Num_capsules # number of seeds produced 
+datP$stage <- "continuous" 
+datP$stageNext <- NA #specify the stage in the next year as "continuous"
+  datP[datP$surv==0 & is.na(datP$surv) == FALSE, "stageNext"] <- "dead" # next stage for dead individuals is "dead"
+  datP[datP$surv==1 & is.na(datP$surv) == FALSE, "stageNext"] <- "continuous"
+datP$number <- 1 
+# add data for seedbank stage
+  # seeds that survived to germinate (exited the seedbank)
+  # seeds that did not germinate
+# add data for seedling stage
+  # seedlings that 
+
 ```
 
