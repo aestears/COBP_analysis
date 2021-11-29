@@ -44,8 +44,11 @@ dat$log_LL_t <- log(dat$LongestLeaf_cm)
 dat$log_LL_tplus1 <- log(dat$longestLeaf_tplus1)
 dat$log_LL_tminus1 <- log(dat$longestLeaf_tminus1)
 
-#### round seed count numbers (that were modeled based on regression) to whole numbers ####
+#### round capsule count numbers (that were modeled based on regression) to whole numbers ####
 dat$Num_capsules <- round(dat$Num_capsules, digits = 0)
+
+#### transform the capsule counts to seed counts (assume 4 seeds/capsule--from Burgess, 2005)
+dat$Num_seeds <- dat$Num_capsules*4
 ```
 
 # Calculate local neighborhood density
@@ -198,10 +201,10 @@ using size in current year (no. of seeds/plant, for those that flowered ~ size_t
 # plot(Num_capsules ~ log_LL_t, data = seedDat)
 
 ## fit poisson glm (for count data)
-seedMod_t <- glm(Num_capsules ~ log_LL_t , data = seedDat, family = poisson)
+seedMod_t <- glm(Num_seeds ~ log_LL_t , data = seedDat, family = poisson)
 summary(seedMod_t)
 ## plot model results
-plot(Num_capsules ~ log_LL_t, data = seedDat)
+plot(Num_seeds ~ log_LL_t, data = seedDat)
 newdata <- data.frame("log_LL_t" = seq(from = min(seedDat$log_LL_t, na.rm = TRUE), 
                                        to = max(seedDat$log_LL_t, na.rm = TRUE),
                                        length.out = 100), "neighbors_20" = mean(seedDat$neighbors_20))
@@ -280,29 +283,46 @@ estabs <- as.data.frame(estabs)
 p.estab.est <- sum(estabs$P_estab, na.rm = TRUE)/sum(is.na(estabs$P_estab)==FALSE)
 ```
 
+### Calculate germination rate and rate of seed viability loss
+```{r}
+## (data in SeedBagGreenhouseSeedlings.csv)--seeds from previous year
+germ.rt.ours <- .03
+
+#data from (Burgess, Hild & Shaw, 2005)--seedbank seed viability/germination rate doesn't seem to change much over time
+germ.rt.Burgess <- mean(c(16.0, 13.0, 12, 8.3, 7.0, 5.3)/45)
+germ.rt <- 0.08 #average together, but trending toward our estimate
+
+## seed viability rate (from Burgess, Hild & Shaw, 2005)
+viab.rt.Burgess <- mean(c(.79,.7,.63))
+viab.rt <- viab.rt.Burgess
+```
+
 ### Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1
 $$outSB$$
 ```{r}
-outSB.est <- .4
+outSB.est <-germ.rt
 ```
 
-### Probability that a seed from the seedbank in year t will stay in teh seedbank in year t+1
+### Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1
 $$staySB$$
 ```{r}
-staySB.est <- .4
+## seed viability rate * 
+staySB.est <- (1-germ.rt)*viab.rt
 ```
 
 
 ### Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1
 $$goSB$$
 ```{r}
-goSB.est <- .4
+## 
+goSB.est <- (1 - germ.rt)*viab.rt
 ```
 
 ### Probability that a seed from a plant in year t will go directly to the seedling stage
 $$goSdlng$$
 ```{r}
-goSdlng.est <- .4
+## use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
+goSdlng.est <- germ.rt
 ```
 
 ## Implement the IPM 
@@ -500,7 +520,9 @@ general_ipm <- general_ipm %>%
       state_end      = c("ht", "ht", "s", "s", "b", "b")
     )
   )
+
 ```
+
 Actually run the IPM!
 ```{r}
 # lower limit of size
@@ -514,8 +536,32 @@ set.seed(2312)
 
 init_pop_vec   <- runif(500)
 
-init_seed_bank <- 20
+## Use data from seedbank to calculate the starting number of seeds (from COBPGreenhouseSeedbankStudyData.csv)
+  ## the no. of seeds that germinated for sample of each plot ()
+  seedStudyGerms <- c(5,4,3,0.01,0.01,1,0.01,0.01,0.01,9,4,9,0,1,1,8,20,1)
+  ## divide the seedcore germs by the germ rate to get the number of (seedbank + seed rain) seeds in each core
+  seedStudyGerms.1 <- seedStudyGerms/germ.rt
+  ## convert the volume of the soil samples to the volume of the plots to get approx. number of (seedbank + seed rain) seeds in each plot
+  ## cores are 3cm in diameter and 2.5cm deep %%% NEED TO ACTUALLY CHECK THIS; THIS IS JUST A PLACEHOLDER %%%, and there are 20 of them/plot
+  coreVol = ((pi*(3/2)^2)*2.5)*20 ## 753.98 cm^3 is the total volume of the soil cores
+  ## calculate the volume of the first 3cm of soil in the plots
+  plotVol = 200*200*2.5
+  ## estimate the number of seeds in the plot
+  seedsEst.all <- (plotVol*seedStudyGerms.1)/coreVol
+  ## total number of seeds produced in each plot in each year
+  seedsTemp <- aggregate(x = dat[,c("Num_seeds")], by = list("Plot_ID" = dat$Plot_ID,
+                                                                      "Year" = dat$Year), FUN = sum, na.rm = TRUE)
+  seedRain.avg <- aggregate(x = seedsTemp$x, by = list("Plot_ID" = seedsTemp$Plot_ID), FUN = mean)
+  ## re-order the plot seedRain data to be in the same order as the seed core data
+  seedRain.avg <- seedRain.avg[c(7:18,1:3,6,4:5),]
+  ## subtract the seedRain from the seedcore seed est to get an estimate of the size of the seedbank state in year t (B(t))
+  seedBank_est <- mean(c(seedsEst.all - seedRain.avg$x))
+  
+  
+## formula = (germs*(1-germ.rate) - mean no. of seeds produced in previous year)
+init_seed_bank <- seedBank_est
 
+## Use seedling data to calculate the starting number of seedlings
 init_seedlings <- round(sum(seedlings$Seedlings_t)/length(seedlings$Seedlings_t),0)
 
 general_ipm <- general_ipm %>%
@@ -554,7 +600,6 @@ lambda(general_ipm)
 
 is_conv_to_asymptotic(general_ipm, tol = 1e-10)
 
-
 lambda_ipmr <- lambda(general_ipm)
 repro_value <- left_ev(general_ipm)
 stable_dist <- right_ev(general_ipm)
@@ -562,62 +607,86 @@ stable_dist <- right_ev(general_ipm)
 ### Visualize the IPM kernel
 ```{r}
 ## make an image of the IPM
-## first have to make a mega-kernel?
+## first have to make a mega-kernel
 mega_mat <- make_iter_kernel(ipm = general_ipm, 
-                             mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P)
+                             mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P),
                                )
 
 Re(eigen(mega_mat[[1]])$values[1]) - lambda(general_ipm)
 
+# ## get the n(z',t) kernel 
+# K <- right_mult(general_ipm$sub_kernels$P, general_ipm$pop_state$n_ht) + right_mult(general_ipm$sub_kernels$leave_seedlings, general_ipm$pop_state$n_s)
+# ## get the seedling vector
+# Seedling_vec <- right_mult(general_ipm$sub_kernels$repro_to_seedlings, general_ipm$pop_state$n_ht) + right_mult(general_ipm$sub_kernels$seedbank_to_seedlings, general_ipm$pop_state$n_b) 
+# ## get the seedbank vector
+# Seedbank_vec <- right_mult(general_ipm$sub_kernels$stay_seedbank, general_ipm$pop_state$n_b) + right_mult(general_ipm$sub_kernels$repro_to_seedbank,  general_ipm$pop_state$n_ht) 
+```
 
-## define the meshpoints
+```{r}
+## visualize the full kernel 
+## define the meshpoints 
 meshpts <- seq(from = L, to = U, length = 500)
+## set up the palette
+pal <- hcl.colors(n = 100, palette = "Heat 2", rev = TRUE)
+## plot the continuous part of the kernel (leave out first two rows and cols that correspond to the discrete stages)
 
-
-## get the n(z',t) kernel 
-K <- right_mult(general_ipm$sub_kernels$P, general_ipm$pop_state$n_ht) + right_mult(general_ipm$sub_kernels$leave_seedlings, general_ipm$pop_state$n_s)
-## get the seedling vector
-Seedling_vec <- right_mult(general_ipm$sub_kernels$repro_to_seedlings, general_ipm$pop_state$n_ht) + right_mult(general_ipm$sub_kernels$seedbank_to_seedlings, general_ipm$pop_state$n_b) 
-## get the seedbank vector
-Seedbank_vec <- right_mult(general_ipm$sub_kernels$stay_seedbank, general_ipm$pop_state$n_b) + right_mult(general_ipm$sub_kernels$repro_to_seedbank,  general_ipm$pop_state$n_ht) 
-
-plot(x = meshpts, 
-     y = meshpts,
-     ipm = K,
-  #mega_mat = c(stay_seedbank, repro_to_seedbank,  seedbank_to_seedlings, repro_to_seedlings,leave_seedlings, P),
-  col = rainbow(100, start = 0.67, end = 0),
-  bw = FALSE,
-  do_contour = TRUE,
-  do_legend = FALSE,
-  exponent = 1
-)
-
-image(t(K)^.1)
+## make the entire figure--lattice plot?
+graphics::layout(mat = matrix(c(1,4, 7, 2, 5, 8, 3, 6, 9),nrow = 3, ncol = 3), widths = c(1,1,5),heights = c(5,1,1))
+par(mar = c(1,3,3,1))
+image(t(mega_mat$mega_matrix[1,3:502]^.1), xaxt = "n", 
+      col = pal[(round(min( t(mega_mat$mega_matrix[1,3:502])^.1),2)*100): 
+                  (round(max( t(mega_mat$mega_matrix[1,3:502])^.1),2)*100)]) ## B(t+1)
+par(mar = c(1,1,3,1))
+image(t(mega_mat$mega_matrix[2,3:502]^.1), xaxt = "n", 
+      col = pal[(round(min( t(mega_mat$mega_matrix[2,3:502])^.1),2)*100): 
+                  (round(max( t(mega_mat$mega_matrix[2,3:502])^.1),2)*100)]) ## S(t+1)
+par(mar = c(1,1,3,3))
+image(x = meshpts, y = meshpts, t(mega_mat$mega_matrix[3:502,3:502])^.1,
+      xlab = "n(z,t)", ylab = "n(z',t+1)", main = "K matrix",
+      col = pal[(round(min( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100): (round(max( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100)]
+      ) ## get the correct values for the color ramp that correspond to the actual probabilities in the entire matrix
+abline(a = 0, b = 1, lty = 2)
+contour(x = meshpts, y = meshpts, 
+        t(mega_mat$mega_matrix[3:502,3:502]), 
+        add = TRUE, drawlabels = TRUE, nlevels = 10, col = "grey30")
+par(mar = c(1,3,1,1))
+image(as.matrix(0), xaxt = "n", yaxt = "n", col = "white") # seedlings to seedbank
+par(mar = c(1,1,1,1))
+image(as.matrix(0), xaxt = "n", yaxt = "n",  col = "white") # seedlings to seedlings
+par(mar = c(1,1,1,3))
+image(t(mega_mat$mega_matrix[3:502,1]^.1), yaxt = "n", 
+        col = pal[(round(min( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100): 
+                    (round(max( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100)]) #S(t)
+par(mar = c(3,3,1,1))
+## plot the staySB probability
+image(as.matrix(mega_mat$mega_matrix[1,1]^.1), xaxt = "n", yaxt = "n")
+par(mar = c(3,1,1,1))
+## plot the seedbank to seedlings probability
+image(as.matrix(t(mega_mat$mega_matrix[2,1])^.1), xaxt = "n", yaxt = "n")
+par(mar = c(3,1,1,3))
+image(t(mega_mat$mega_matrix[3:502,1]^.1), yaxt = "n", 
+        col = pal[(round(min( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100): 
+                    (round(max( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100)]) ## B(t)(is all zeros--can't transition to continuous stage from the seedbank)
 ```
 
 
 ```{r}
-#try using IPMpack
-#devtools::install_github("cran/IPMpack")
-library(IPMpack)
+## visualize the P matrix
+image(x = meshpts, 
+      y = meshpts,
+      t(make_iter_kernel(ipm = general_ipm, mega_mat = c(P))$mega_matrix),
+      xlab = "n(z,t)", ylab = "n(z',t+1)", main = "P matrix")
+contour(x = meshpts,
+        y = meshpts,
+        t(make_iter_kernel(ipm = general_ipm, mega_mat = c(P))$mega_matrix), 
+        add = TRUE, drawlabels = TRUE, nlevels = 10, col = "grey30")
 
-## make sure data is in the correct format for IPMpack
-datP <- dat
-datP$size <- datP$log_LL_t
-datP$sizeNext <- datP$log_LL_tplus1
-datP$surv <- datP$survives_tplus1
-datP$fec1 <- datP$flowering # probability of reproducing
-datP$fec2 <- datP$Num_capsules # number of seeds produced 
-datP$stage <- "continuous" 
-datP$stageNext <- NA #specify the stage in the next year as "continuous"
-  datP[datP$surv==0 & is.na(datP$surv) == FALSE, "stageNext"] <- "dead" # next stage for dead individuals is "dead"
-  datP[datP$surv==1 & is.na(datP$surv) == FALSE, "stageNext"] <- "continuous"
-datP$number <- 1 
-# add data for seedbank stage
-  # seeds that survived to germinate (exited the seedbank)
-  # seeds that did not germinate
-# add data for seedling stage
-  # seedlings that 
+## add the seedling vector
+  hist(make_iter_kernel(ipm = general_ipm, mega_mat = c(stay_seedbank,repro_to_seedbank))$mega_matrix)
+## add the seedbank vector
+
+
 
 ```
+
 
