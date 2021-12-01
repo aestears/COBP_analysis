@@ -33,9 +33,7 @@ $$B(t+1) = B(t)staySB+goSB\int_{L}^{U}P_b(z)b(z)n(z,t)dz $$
 # Load *Oenothera coloradensis* census data
 ```{r}
 # load spatialized data, which we'll need for neighborhood calculations
-load("../Processed_Data/spatial_COBP.RData")
-dat <- butterfly
-# dat <- read.csv("../Raw Data/COBP_long_CURRENT.csv")
+dat <- read.csv("../Raw Data/COBP_long_CURRENT.csv")
 ```
 ## transform the necessary variables
 ```{r}
@@ -51,110 +49,11 @@ dat$Num_capsules <- round(dat$Num_capsules, digits = 0)
 dat$Num_seeds <- dat$Num_capsules*4
 ```
 
-# Calculate local neighborhood density
-```{r}
-# use plantTracker package
-library(plantTracker)
-# make a column that has 'trackID' data
-dat$trackID <- paste0(dat$Plot_ID,"_",dat$ID)
-dat$Species <- "OENCOL"
-
-## calculate neighbors w/in a 10cm radius
-dat_1 <- plantTracker::getNeighbors(dat = dat, buff = 10, method = "count", compType = "oneSpp", quad = "Plot_ID")
-## rename column to indicate radius
-names(dat_1)[6] <-"neighbors_10"
-
-## calculate neighbors w/in a 5 cm radius
-dat_2 <- plantTracker::getNeighbors(dat = dat_1, buff = 5, method = "count", compType = "oneSpp", quad = "Plot_ID")
-## rename column to indicate radius
-names(dat_2)[6] <-"neighbors_5"
-
-## calculate neighbors w/in a 15 cm radius
-dat_3 <- plantTracker::getNeighbors(dat = dat_2, buff = 15, method = "count", compType = "oneSpp", quad = "Plot_ID")
-## rename column to indicate radius
-names(dat_3)[6] <-"neighbors_15"
-
-## calculate neighbors w/in a 20 cm radius
-dat_4 <- plantTracker::getNeighbors(dat = dat_3, buff = 20, method = "count", compType = "oneSpp", quad = "Plot_ID")
-## rename column to indicate radius
-names(dat_4)[6] <-"neighbors_20"
-
-## calculate neighbors w/in a 40 cm radius
-dat_5 <- plantTracker::getNeighbors(dat = dat_4, buff = 40, method = "count", compType = "oneSpp", quad = "Plot_ID")
-## rename column to indicate radius
-names(dat_5)[6] <-"neighbors_40"
-
-## calculate neighbors w/in a 60 cm radius
-dat_6 <- plantTracker::getNeighbors(dat = dat_5, buff = 60, method = "count", compType = "oneSpp", quad = "Plot_ID")
-## rename column to indicate radius
-names(dat_6)[6] <-"neighbors_60"
-
-## calculate neighbors w/in a 100 cm radius
-dat_7 <- plantTracker::getNeighbors(dat = dat_6, buff = 100, method = "count", compType = "oneSpp", quad = "Plot_ID")
-## rename column to indicate radius
-names(dat_7)[6] <-"neighbors_100"
-
-dat <- dat_7
-```
-
-Figure out which neighborhood radius makes the most sense, i.e. explains the most variation in growth and survival
-```{r}
-## growth models for each radius
-neighMod_5 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_5, data = dat)
-summary(neighMod_5)
-neighMod_10 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_10, data = dat)
-summary(neighMod_10)
-neighMod_15 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_15, data = dat)
-summary(neighMod_15)
-neighMod_20 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_20, data = dat)
-summary(neighMod_20)
-neighMod_40 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_40, data = dat)
-summary(neighMod_40)
-neighMod_60 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_60, data = dat)
-summary(neighMod_60)
-neighMod_100 <- lm(log_LL_tplus1 ~ log_LL_t + neighbors_100, data = dat)
-summary(neighMod_100)
-```
-
-Then, visually compare models
-```{r}
-plot(log_LL_tplus1 ~ log_LL_t, data = dat)
-abline(lm(log_LL_tplus1 ~ log_LL_t, data = dat), col = "red") # add model w/out neighbor term
-#make data for predictions
-newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE), 
-               to = max(dat$log_LL_t, na.rm = TRUE),
-               length.out = 100), "neighbors_5" = mean(dat$neighbors_5), "neighbors_10" = mean(dat$neighbors_10), "neighbors_15" = mean(dat$neighbors_15), "neighbors_20" = mean(dat$neighbors_20), "neighbors_40" = mean(dat$neighbors_40))
-lines(x = newdata$log_LL_t, y = predict(object = neighMod_5, newdata =  newdata), col = "blue")
-lines(x = newdata$log_LL_t, y = predict(object = neighMod_10, newdata =  newdata), col = "green")
-lines(x = newdata$log_LL_t, y = predict(object = neighMod_15, newdata =  newdata), col = "orange")
-lines(x = newdata$log_LL_t, y = predict(object = neighMod_20, newdata =  newdata), col = "pink")
-lines(x = newdata$log_LL_t, y = predict(object = neighMod_40, newdata =  newdata), col = "purple")
-#abline(a = coef(neighMod_5)[1], b = coef(neighMod_5)[2], col = "blue")
-#abline(a = coef(neighMod_10)[1], b = coef(neighMod_10)[2], col = "green")
-#abline(a = coef(neighMod_15)[1], b = coef(neighMod_15)[2], col = "orange")
-abline(a = 0, b = 1, col = "darkgrey", lty = 2) ## add a 1:1 line
-```
-
-Now, compare the models using AIC
-```{r}
-AIC(lm(log_LL_tplus1 ~ log_LL_t, data = dat), neighMod_5, neighMod_10, neighMod_15, neighMod_20, neighMod_40, neighMod_60, neighMod_100)
-
-## plot the decline in AIC with radius
-plot(x =c(0,5,10,15,20,40,60,100), y = c(3186.305,3115.361,3046.081,3019.100, 3002.569, 2946.028, 2935.554, 2924.782), type = "l")
-
-## plot the change in effect size w/ size of radius
-plot(x =c(0,5,10,15,20,40,60,100), y = c(NA, coef(neighMod_5)[3], coef(neighMod_10)[3], coef(neighMod_15)[3], coef(neighMod_20)[3], coef(neighMod_40)[3], coef(neighMod_60)[3], coef(neighMod_100)[3]), type = "l")
-```
-
-Maybe use neighbors_20? (since the AIC decreases, but the effect size is smaller)
-
-
 ## other potential covariates from the data
 Invertebrate leaf herbivory, stem herbivory, leaf spots (unknown source?)
 
 # Make vital rate models 
-### Survival 
-$$s(z)$$
+### Survival ($s(z)$)
 ```{r}
 ## subset the data to exclude flowering individuals
 survDat <- dat[dat$flowering==0 | is.na(dat$flowering),]
@@ -169,12 +68,11 @@ summary(survMod)
 plot(survives_tplus1 ~ log_LL_t, data = survDat)
 newdata <- data.frame("log_LL_t" = seq(from = min(survDat$log_LL_t, na.rm = TRUE), 
                to = max(survDat$log_LL_t, na.rm = TRUE),
-               length.out = 100), "neighbors_20" = mean(survDat$neighbors_20))
+               length.out = 100))
 lines(x = newdata$log_LL_t, y = predict(object = survMod, newdata =  newdata, type = "response"), col = "red")
 ```
 
-### Growth
-$$G(z',z)$$
+### Growth ($G(z',z)$)
 ```{r}
 # ## visualize the data
 # plot(log_LL_tplus1 ~ log_LL_t, data = dat)
@@ -186,12 +84,11 @@ summary(sizeMod)
 plot(log_LL_tplus1 ~ log_LL_t, data = dat)
 newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE), 
                to = max(dat$log_LL_t, na.rm = TRUE),
-               length.out = 100), "neighbors_20" = mean(dat$neighbors_20))
+               length.out = 100))
 lines(x = newdata$log_LL_t, y = predict(object = sizeMod, newdata =  newdata), col = "red")
 ```
 
-### Number of seeds produced, according to plant size
-$$b(z)$$
+### Number of seeds produced, according to plant size ($b(z)$)
 using size in current year (no. of seeds/plant, for those that flowered ~ size_t)
 ```{r}
  ## use only plants that flowered 
@@ -207,12 +104,11 @@ summary(seedMod_t)
 plot(Num_seeds ~ log_LL_t, data = seedDat)
 newdata <- data.frame("log_LL_t" = seq(from = min(seedDat$log_LL_t, na.rm = TRUE), 
                                        to = max(seedDat$log_LL_t, na.rm = TRUE),
-                                       length.out = 100), "neighbors_20" = mean(seedDat$neighbors_20))
+                                       length.out = 100))
 lines(x = newdata$log_LL_t, y = predict(object = seedMod_t, newdata =  newdata, type = "response"), col = "red")
 ```
 
-### Flowering probability
-$$p_b(z)$$
+### Flowering probability ($p_b(z)$)
 using size in current year (w/ squared term)
 ```{r}
 ## logistic glm with log-transformed size_t
@@ -222,12 +118,11 @@ summary(flwrMod_t)
 plot(flowering ~ log_LL_t, data = dat)
 newdata <- data.frame("log_LL_t" = seq(from = min(dat$log_LL_t, na.rm = TRUE), 
                                        to = max(dat$log_LL_t, na.rm = TRUE),
-                                       length.out = 100), "neighbors_20" = mean(seedDat$neighbors_20))
+                                       length.out = 100))
 lines(x = newdata$log_LL_t, y = predict(object = flwrMod_t, newdata =  newdata, type = "response"), col = "red")
 ```
 
-### Distribution of recruit size 
-$$c_o(z')$$
+### Distribution of recruit size ($c_o(z')$)
 ```{r}
 ## subset the data
 recD <- dat[dat$age == 0 & is.na(dat$age) == FALSE,]
@@ -239,8 +134,7 @@ hist(recD$log_LL_t)
 abline(v = recMod$coefficients, col = "blue", lwd = 2)
 ```
 
-### Probability of a seedling in year *t* establishing to a rosette in year *t+1*
-$$p_{estab}$$
+### Probability of a seedling in year *t* establishing to a rosette in year *t+1* ($p_{estab}$)
 ```{r message=FALSE}
 ## make a column in 'dat' that labels 'recruits' to the rosette stage
 dat$recruit <- 0
@@ -297,29 +191,25 @@ viab.rt.Burgess <- mean(c(.79,.7,.63))
 viab.rt <- viab.rt.Burgess
 ```
 
-### Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1
-$$outSB$$
+### Probability that a seed from the seedbank in year t will germinate to a seedling in year t+1 ($outSB$)
 ```{r}
 outSB.est <-germ.rt
 ```
 
-### Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1
-$$staySB$$
+### Probability that a seed from the seedbank in year t will stay in the seedbank in year t+1 ($staySB$)
 ```{r}
 ## seed viability rate * 
 staySB.est <- (1-germ.rt)*viab.rt
 ```
 
 
-### Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1
-$$goSB$$
+### Probability that a seed produced by an adult plant in year t will enter the seedbank in year t+1 ($goSB$)
 ```{r}
 ## 
 goSB.est <- (1 - germ.rt)*viab.rt
 ```
 
-### Probability that a seed from a plant in year t will go directly to the seedling stage
-$$goSdlng$$
+### Probability that a seed from a plant in year t will go directly to the seedling stage ($goSdlng$)
 ```{r}
 ## use the germination rate, since it doesn't seem to change much with age (Burgess, Hild & Shaw, 2005)
 goSdlng.est <- germ.rt
@@ -370,7 +260,7 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
                         di_dd = "di", # make it density independent
                         det_stoch = "det") %>% # make it deterministic
   define_kernel(
-    name          = "P",
+    name          = "P", # survival 
     
     # We add d_ht to formula to make sure integration is handled correctly.
     # This variable is generated internally by make_ipm(), so we don't need
@@ -389,8 +279,8 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
     data_list     = data_list,
     states        = list(c('ht')),
     uses_par_sets = FALSE,
-    evict_cor     = FALSE
-    #evict_fun     = truncated_distributions('norm', 'g')
+    evict_cor     = TRUE,
+    evict_fun     = truncated_distributions('norm', 'g.')
 ) %>%
   define_kernel(
     name          = "leave_seedlings", ## leave seedling stage and go to rosette stage
@@ -407,8 +297,8 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
     
     states        = list(c('ht', "s")),
     uses_par_sets = FALSE,
-    evict_cor     = FALSE
-    #evict_fun     = truncated_distributions('norm','g')
+    evict_cor     = TRUE,
+    evict_fun     = truncated_distributions('norm','c_o.')
 ) %>%
   define_kernel(
     name    = "repro_to_seedlings",
@@ -421,21 +311,20 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
     
     family        = "CD",
     
-    goSdlng.          = goSdlng.,
+    goSdlng.      = goSdlng.,
     p_b.          = inv_logit_2(p_b_int, p_b_slope, p_b_slope_2, ht_1),
     b.            = exp(b_int + b_slope * ht_1),
     data_list     = data_list,
     states        = list(c('ht', 's')),
     uses_par_sets = FALSE,
     evict_cor     = FALSE
-    #evict_fun     = truncated_distributions('norm', 'g')
 
 ) %>%
   define_kernel(
     
     name          = 'seedbank_to_seedlings',
     
-    formula       =outSB.,
+    formula       = outSB.,
     
     # Note that now, family = "DC" because it denotes a discrete -> continuous transition
     
@@ -446,7 +335,8 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
     # Note that here, we add "s" to our list in states, because this kernel uses seedlings, and 'b', since this kernel using the seedbank stage
     
     states        = list(c('b', 's')),
-    uses_par_sets = FALSE
+    uses_par_sets = FALSE,
+    evict_cor = FALSE
     
   ) %>%
   define_kernel(
@@ -462,7 +352,8 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
     staySB.        = staySB,
     data_list     = data_list,
     states        = list(c('b')),
-    uses_par_sets = FALSE
+    uses_par_sets = FALSE,
+    evict_cor = FALSE
     
   ) %>%
   define_kernel(
@@ -481,34 +372,9 @@ general_ipm <- init_ipm(sim_gen = "general", # make a general IPM
     
     states        = list(c('b', 'ht')),
     uses_par_sets = FALSE,
-    evict_cor     = FALSE
-    #evict_fun     = truncated_distributions(fun = 'norm', target = 'p_b')
+    evict_cor = FALSE
 ) 
 ## We’ve now defined all of the kernels, next are the implementation details. These also differ somewhat from simple IPMs. The key difference in the implementation arguments list lies in the state_start and state_end of each kernel, and is related to the family argument of each kernel. Kernels that begin with one state and end in a different state (e.g. moving from seed bank to a plant) will have different entries in the state_start and state_end slots. It is very important to get these correct, as ipmr uses this information to generate the model iteration procedure automatically (i.e. code corresponding to Equations 1-2).
-
-# general_ipm <- general_ipm %>%
-#   define_impl(
-#     list(
-#       P                     = list(int_rule    = "midpoint",
-#                                    state_start = "ht",
-#                                    state_end   = "ht"),
-#       leave_seedlings       = list(int_rule    = "midpoint",
-#                                    state_start = "s",
-#                                    state_end   = "ht"),
-#       repro_to_seedlings    = list(int_rule    = "midpoint",
-#                                    state_start = "ht",
-#                                    state_end   = "s"),
-#       seedbank_to_seedlings = list(int_rule    = "midpoint",
-#                                    state_start = "b",
-#                                    state_end   = "s"),
-#       stay_seedbank         = list(int_rule    = "midpoint",
-#                                    state_start = "b",
-#                                    state_end   = "b"),
-#       repro_to_seedbank     = list(int_rule    = "midpoint",
-#                                    state_start = "ht",
-#                                    state_end   = "b")
-#       )
-#     )
 
 ## alternative method
 general_ipm <- general_ipm %>%
@@ -520,7 +386,6 @@ general_ipm <- general_ipm %>%
       state_end      = c("ht", "ht", "s", "s", "b", "b")
     )
   )
-
 ```
 
 Actually run the IPM!
@@ -611,15 +476,8 @@ stable_dist <- right_ev(general_ipm)
 mega_mat <- make_iter_kernel(ipm = general_ipm, 
                              mega_mat = c(stay_seedbank, 0, repro_to_seedbank, seedbank_to_seedlings, 0, repro_to_seedlings, 0, leave_seedlings, P),
                                )
-
+## check to make sure I constructed the mega-kernel correctly (should be nearly equal values)
 Re(eigen(mega_mat[[1]])$values[1]) - lambda(general_ipm)
-
-# ## get the n(z',t) kernel 
-# K <- right_mult(general_ipm$sub_kernels$P, general_ipm$pop_state$n_ht) + right_mult(general_ipm$sub_kernels$leave_seedlings, general_ipm$pop_state$n_s)
-# ## get the seedling vector
-# Seedling_vec <- right_mult(general_ipm$sub_kernels$repro_to_seedlings, general_ipm$pop_state$n_ht) + right_mult(general_ipm$sub_kernels$seedbank_to_seedlings, general_ipm$pop_state$n_b) 
-# ## get the seedbank vector
-# Seedbank_vec <- right_mult(general_ipm$sub_kernels$stay_seedbank, general_ipm$pop_state$n_b) + right_mult(general_ipm$sub_kernels$repro_to_seedbank,  general_ipm$pop_state$n_ht) 
 ```
 
 ```{r}
@@ -631,42 +489,68 @@ pal <- hcl.colors(n = 100, palette = "Heat 2", rev = TRUE)
 ## plot the continuous part of the kernel (leave out first two rows and cols that correspond to the discrete stages)
 
 ## make the entire figure--lattice plot?
-graphics::layout(mat = matrix(c(1,4, 7, 2, 5, 8, 3, 6, 9),nrow = 3, ncol = 3), widths = c(1,1,5),heights = c(5,1,1))
-par(mar = c(1,3,3,1))
-image(t(mega_mat$mega_matrix[1,3:502]^.1), xaxt = "n", 
-      col = pal[(round(min( t(mega_mat$mega_matrix[1,3:502])^.1),2)*100): 
-                  (round(max( t(mega_mat$mega_matrix[1,3:502])^.1),2)*100)]) ## B(t+1)
-par(mar = c(1,1,3,1))
-image(t(mega_mat$mega_matrix[2,3:502]^.1), xaxt = "n", 
-      col = pal[(round(min( t(mega_mat$mega_matrix[2,3:502])^.1),2)*100): 
-                  (round(max( t(mega_mat$mega_matrix[2,3:502])^.1),2)*100)]) ## S(t+1)
-par(mar = c(1,1,3,3))
+graphics::layout(mat = matrix(c(1,4, 7, 2, 5, 8, 3, 6, 9),nrow = 3, ncol = 3), widths = c(1.5,1.5,6),heights = c(6,1.5,1.5))
+## B(t+1)
+par(mar = c(3,3,3,1))
+image(t(mega_mat$mega_matrix[1,3:502]^.1), xaxt = "n", yaxt = "n",
+      main = "B(t+1)",
+      col = pal[(round(min((mega_mat$mega_matrix[1,3:502])^.1),2)*100): 
+                  (round(max((mega_mat$mega_matrix[1,3:502])^.1),2)*100)]) 
+mtext(side = 1, text  = c("continous to \nseedbank"), line = -1, cex = .75)
+## S(t+1)
+par(mar = c(3,1,3,1))
+image(t(mega_mat$mega_matrix[2,3:502]^.1), xaxt = "n", yaxt = "n",
+      main = "S(t+1)",
+      col = pal[(round(min((mega_mat$mega_matrix[2,3:502])^.1),2)*100): 
+                  (round(max((mega_mat$mega_matrix[2,3:502])^.1),2)*100)]) 
+mtext(side = 1, text  = c("continous to \nseedlings"), line = -1, cex = .75)
+## K matrix
+par(mar = c(3,3,3,3)
+    ,mgp = c(1.75,.5,0)
+    )
 image(x = meshpts, y = meshpts, t(mega_mat$mega_matrix[3:502,3:502])^.1,
-      xlab = "n(z,t)", ylab = "n(z',t+1)", main = "K matrix",
+      xlab = "n(z,t); log(cm)", ylab = "n(z',t+1); log(cm)", 
+      main = "Continuous Stage (t+1)",
       col = pal[(round(min( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100): (round(max( t(mega_mat$mega_matrix[3:502,3:502])^.1),2)*100)]
       ) ## get the correct values for the color ramp that correspond to the actual probabilities in the entire matrix
+text(x = 3.8, y = 2.25, c("Continuous Stage (t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
 abline(a = 0, b = 1, lty = 2)
 contour(x = meshpts, y = meshpts, 
         t(mega_mat$mega_matrix[3:502,3:502]), 
         add = TRUE, drawlabels = TRUE, nlevels = 10, col = "grey30")
+# seedlings to seedbank
 par(mar = c(1,3,1,1))
-image(as.matrix(0), xaxt = "n", yaxt = "n", col = "white") # seedlings to seedbank
+image(as.matrix(0), xaxt = "n", yaxt = "n", col = "white") 
+mtext(side = 1, text  = c("can't go from \nseedling \nto seedbank"), line = -1, cex = .75)
+# seedlings to seedlings
 par(mar = c(1,1,1,1))
-image(as.matrix(0), xaxt = "n", yaxt = "n",  col = "white") # seedlings to seedlings
-par(mar = c(1,1,1,3))
-image(t(mega_mat$mega_matrix[3:502,1]^.1), yaxt = "n", 
+image(as.matrix(0), xaxt = "n", yaxt = "n",  col = "white") 
+mtext(side = 1, text  = c("can't stay in \nseedlings"), line = -1, cex = .75)
+#S(t)
+par(mar = c(1,3,1,3))
+image(as.matrix(mega_mat$mega_matrix[3:502,2]^.1), yaxt = "n", xaxt = "n",
         col = pal[(round(min( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100): 
-                    (round(max( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100)]) #S(t)
-par(mar = c(3,3,1,1))
+                    (round(max( t(mega_mat$mega_matrix[3:502,2])^.1),2)*100)]) 
+text(x = 1.05,y = .5, c("S(t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
+mtext(side = 1, text  = c("seedling to continuous stage"), line = -1, cex = .75)
 ## plot the staySB probability
-image(as.matrix(mega_mat$mega_matrix[1,1]^.1), xaxt = "n", yaxt = "n")
-par(mar = c(3,1,1,1))
+par(mar = c(3,3,1,1))
+image(as.matrix(mega_mat$mega_matrix[1,1]^.1), xaxt = "n", yaxt = "n",
+      col = pal[round(max(mega_mat$mega_matrix[1,1]^.1),2)*100])
+mtext(side = 1, text  = c("stay in \nseedbank"), line = -1, cex = .75)
 ## plot the seedbank to seedlings probability
-image(as.matrix(t(mega_mat$mega_matrix[2,1])^.1), xaxt = "n", yaxt = "n")
-par(mar = c(3,1,1,3))
-image(t(mega_mat$mega_matrix[3:502,1]^.1), yaxt = "n", 
+par(mar = c(3,1,1,1))
+image(as.matrix(t(mega_mat$mega_matrix[2,1])^.1), xaxt = "n", yaxt = "n",
+      col = pal[round(max(t(mega_mat$mega_matrix[2,1])^.1),2)*100])
+mtext(side = 1, text = c("seedbank to \nseedlings"), line = -1, cex = .75)
+## B(t)(is all zeros--can't transition to continuous stage from the seedbank)
+par(mar = c(3,3,1,3))
+image(t(mega_mat$mega_matrix[3:502,1]^.1), yaxt = "n", xaxt = "n",
         col = pal[(round(min( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100): 
-                    (round(max( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100)]) ## B(t)(is all zeros--can't transition to continuous stage from the seedbank)
+                    (round(max( t(mega_mat$mega_matrix[3:502,1])^.1),2)*100)]) 
+text(x = 1.1,y = .5, c("B(t)"), xpd = NA, srt = -90, cex = 1.25, font = 2)
+mtext(side = 1, text = c("can't go from seedbank to continuous stage"), line = -1, cex = .75)
+
 ```
 
 
@@ -680,13 +564,6 @@ contour(x = meshpts,
         y = meshpts,
         t(make_iter_kernel(ipm = general_ipm, mega_mat = c(P))$mega_matrix), 
         add = TRUE, drawlabels = TRUE, nlevels = 10, col = "grey30")
-
-## add the seedling vector
-  hist(make_iter_kernel(ipm = general_ipm, mega_mat = c(stay_seedbank,repro_to_seedbank))$mega_matrix)
-## add the seedbank vector
-
-
-
 ```
 
 
