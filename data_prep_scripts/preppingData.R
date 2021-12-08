@@ -121,6 +121,8 @@ butterfly <- butterfly[butterfly$survives_t != 0 & is.na(butterfly$survives_t) =
 ## temporarily remove bad rows (missing leaf size data!)
 # butterfly <- butterfly[is.na(butterfly$LongestLeaf_cm) == FALSE,]
 butterfly$age <- as.integer(butterfly$age)
+# make a column for no. of seeds (multiply # of capsules by 4)
+butterfly$Num_seeds <- round((butterfly$Num_capsules * 4), 0)
 
 ## write this long-form data to file
-write.csv(butterfly, file = "../Raw Data/COBP_long_CURRENT.csv", row.names = FALSE)
+write.csv(butterfly, file = "../Processed_Data/COBP_long_CURRENT.csv", row.names = FALSE)

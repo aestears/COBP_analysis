@@ -143,4 +143,4 @@ climPrecip <- Climate %>%
 Climate <- left_join(climGrow, climWinter) %>% 
   left_join(climPrecip)
 
-rm(list = ls()[!(ls() %in% c("soilTemp_plot", "soilMoist", "Climate"))])
+rm(list = c("baseClim", "climGrow", "climPrecip", "climWinter", "Dtemps", "S3", "S8","SoapClim", "soilTemp_grow","soilTemp_grow_monthly",  "soilTemp", "soilTemp_winter", "soilTemp_winter_monthly", "U3","U4","U6"))
