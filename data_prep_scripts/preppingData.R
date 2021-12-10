@@ -124,5 +124,10 @@ butterfly$age <- as.integer(butterfly$age)
 # make a column for no. of seeds (multiply # of capsules by 4)
 butterfly$Num_seeds <- round((butterfly$Num_capsules * 4), 0)
 
+#### make log-transformed size variables ####
+butterfly$log_LL_t <- log(butterfly$LongestLeaf_cm)
+butterfly$log_LL_tplus1 <- log(butterfly$longestLeaf_tplus1)
+butterfly$log_LL_tminus1 <- log(butterfly$longestLeaf_tminus1)
+
 ## write this long-form data to file
 write.csv(butterfly, file = "../Processed_Data/COBP_long_CURRENT.csv", row.names = FALSE)
