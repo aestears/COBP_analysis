@@ -18,22 +18,22 @@ library(tidyverse)
 ![Figure of the O. coloradensis life-cycle, with transitions labeled](images/COBP_lifecyclediagram.jpg)
 
 ### Functions in the IPM kernel
-For data from a pre-reproductive census, with a discrete seedling and seedbank stages 
+These are the functions that describe each element of the IPM: 
 
-
-**Distribution of size of individuals in year *t+1*:**
+**Distribution of size of individuals in year *t+1* (continuous stage):**
 New recruits from the seedling stage + growth and survival kernel
 $$n(z',t+1) = S(t)p_{estab}c_o(z') + \int_{L}^{U}(1-P_b(z))s(z)G(z',z)n(z,t)dz $$
-**Size of the seedling stage:**
+**Size of the seedling stage (discrete stage):**
 $$S(t+1) = B(t)outSB + goSdlng\int_{L}^{U}P_b(z)b(z)n(z,t)dz $$
 
-**Seedbank:**  (after Ellner, 2016)
+**Seedbank (discrete stage):**  (after Ellner, 2016)
 $$B(t+1) = B(t)staySB+goSB\int_{L}^{U}P_b(z)b(z)n(z,t)dz $$
 
 # Load *Oenothera coloradensis* census data
 ```{r}
-# load spatialized data, which we'll need for neighborhood calculations
-dat <- read.csv("../Raw Data/COBP_long_CURRENT.csv")
+# load continuous stage data
+dat <- read.csv("../Processed_Data//COBP_long_CURRENT.csv")
+discreteDat <- read.csv("../Processed_Data/discreteStageData.csv")
 ```
 ## transform the necessary variables
 ```{r}

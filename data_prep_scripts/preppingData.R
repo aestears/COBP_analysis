@@ -23,6 +23,7 @@ butterfly_2 <- butterfly_temp[,c(1:7, 9, 11, 13)] %>%
   pivot_longer(cols = c("Alive_2018", "Alive_2019",  "Alive_2020"), names_to = "Year", values_to = "survives_t")
 butterfly_2$Year <- as.integer(str_extract_all(butterfly_2$Year, pattern = "[:digit:]+", simplify = TRUE))
 
+
 butterfly_3 <- butterfly_temp[,c(1:7, 14:16)] %>% 
   pivot_longer(cols = c("Flowering_2018", "Flowering_2019",  "Flowering_2020"), names_to = "Year", values_to = "flowering")
 butterfly_3$Year <- as.integer(str_extract_all(butterfly_3$Year, pattern = "[:digit:]+", simplify = TRUE))
@@ -128,6 +129,27 @@ butterfly$Num_seeds <- round((butterfly$Num_capsules * 4), 0)
 butterfly$log_LL_t <- log(butterfly$LongestLeaf_cm)
 butterfly$log_LL_tplus1 <- log(butterfly$longestLeaf_tplus1)
 butterfly$log_LL_tminus1 <- log(butterfly$longestLeaf_tminus1)
+
+#### calculate population size for each plot  ####
+N_dat <- butterfly %>% 
+  group_by(Plot_ID, Year) %>% 
+  summarize("N_adults_t" = n())
+
+# add seedling and adult N values together
+N_dat <- seedlings %>% 
+  rename(N_seedlings_t = Seedlings_t) %>% 
+  mutate(Year = as.integer(Year)) %>% 
+  left_join(N_dat) %>% 
+  mutate(N_all_t = (N_seedlings_t + N_adults_t))
+# add the 'N' data to the 'dat' data.frame
+# first, remove the spaces from the site names in the butterfly d.f
+butterfly$Site <- str_replace(string = butterfly$Site, pattern = " ", replacement = "_")
+butterfly <- left_join(butterfly, N_dat, by = c('Plot_ID' = "Plot_ID", "Year" = "Year", "Site" = "Site"))
+
+#### get establishment/recruit size data ####
+# make a column in 'butterfly' that labels 'recruits' to the rosette stage
+butterfly$recruit <- 0
+butterfly[butterfly$age==0 & is.na(butterfly$age)==FALSE,"recruit"] <- 1
 
 ## write this long-form data to file
 write.csv(butterfly, file = "../Processed_Data/COBP_long_CURRENT.csv", row.names = FALSE)

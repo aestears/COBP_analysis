@@ -96,7 +96,7 @@ Climate <- Climate %>%
   mutate(precip_cm = round(precip_in*2.54,2), tMin_C = round(((tMin_F-32)*(5/9)),2),
             tMax_C = round(((tMax_F-32)*(5/9)),2), tMean_C = round(((tMean_F-32)*(5/9)),2),
             meanDewPt_C = round(((meanDewPt_F-32)*(5/9)),2)) %>% 
-  select(Date, Location, precip_cm, tMin_C, tMax_C, tMean_C, meanDewPt_C, VPDmin_hPa, VPDmax_hPa)
+  dplyr::select(Date, Location, precip_cm, tMin_C, tMax_C, tMean_C, meanDewPt_C, VPDmin_hPa, VPDmax_hPa)
 
 # calculate growing season mean temp/year
 climGrow <- Climate %>% 
@@ -142,5 +142,8 @@ climPrecip <- Climate %>%
 ## add all the climate data together into one d.f.
 Climate <- left_join(climGrow, climWinter) %>% 
   left_join(climPrecip)
+
+## remove the spaces in the site names
+soilTemp_plot$Site <- str_replace(string = soilTemp_plot$Site, pattern = " ", replacement = "_")
 
 rm(list = c("baseClim", "climGrow", "climPrecip", "climWinter", "Dtemps", "S3", "S8","SoapClim", "soilTemp_grow","soilTemp_grow_monthly",  "soilTemp", "soilTemp_winter", "soilTemp_winter_monthly", "U3","U4","U6"))
