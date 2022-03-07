@@ -49,7 +49,7 @@ soilTemp_grow_monthly <- soilTemp %>%
   group_by(Plot, month) %>% 
   summarize(SoilTemp_grow_C = mean(SoilTemp))
 
-# calculate winter average soil temp (September - March) 
+# calculate winter average soil temp (October- March) 
 soilTemp_winter <- soilTemp %>% 
   filter(month %in% c(1:3,10:12)) %>% 
   group_by(Plot, Site, Location) %>% 
