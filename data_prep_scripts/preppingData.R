@@ -131,21 +131,21 @@ butterfly$log_LL_t <- log(butterfly$LongestLeaf_cm)
 butterfly$log_LL_tplus1 <- log(butterfly$longestLeaf_tplus1)
 butterfly$log_LL_tminus1 <- log(butterfly$longestLeaf_tminus1)
 
-#### calculate population size for each plot  ####
-N_dat <- butterfly %>% 
-  group_by(Plot_ID, Year) %>% 
-  summarize("N_adults_t" = n())
-
-# add seedling and adult N values together
-N_dat <- seedlings %>% 
-  rename(N_seedlings_t = Seedlings_t) %>% 
-  mutate(Year = as.integer(Year)) %>% 
-  left_join(N_dat) %>% 
-  mutate(N_all_t = (N_seedlings_t + N_adults_t))
-# add the 'N' data to the 'dat' data.frame
-# first, remove the spaces from the site names in the butterfly d.f
-butterfly$Site <- str_replace(string = butterfly$Site, pattern = " ", replacement = "_")
-butterfly <- left_join(butterfly, N_dat, by = c('Plot_ID' = "Plot_ID", "Year" = "Year", "Site" = "Site"))
+# #### calculate population size for each plot  ####
+# N_dat <- butterfly %>% 
+#   group_by(Plot_ID, Year) %>% 
+#   summarize("N_adults_t" = n())
+# 
+# # add seedling and adult N values together
+# N_dat <- seedlings %>% 
+#   rename(N_seedlings_t = Seedlings_t) %>% 
+#   mutate(Year = as.integer(Year)) %>% 
+#   left_join(N_dat) %>% 
+#   mutate(N_all_t = (N_seedlings_t + N_adults_t))
+# # add the 'N' data to the 'dat' data.frame
+# # first, remove the spaces from the site names in the butterfly d.f
+# butterfly$Site <- str_replace(string = butterfly$Site, pattern = " ", replacement = "_")
+# butterfly <- left_join(butterfly, N_dat, by = c('Plot_ID' = "Plot_ID", "Year" = "Year", "Site" = "Site", "Q"))
 
 #### get establishment/recruit size data ####
 # make a column in 'butterfly' that labels 'recruits' to the rosette stage
