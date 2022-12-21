@@ -7,7 +7,7 @@ library(tidyverse)
 ## load COBP demographic data
 
 ## remove data that isn't necessary (notes, leaf spots, invert, stem #s, #capsules, bolting)
-butterfly_temp <- read.csv("../../Oenothera coloradensis project/Raw Data/COBP_data_08_23_21.csv") %>% 
+butterfly_temp <- read.csv("/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/Raw Data/COBP_data_08_23_21.csv") %>% 
   dplyr::select(c("Location", "Site", "Plot_ID", "Quadrant", "ID", "X_cm", "Y_cm", "LongestLeaf_cm_2018", "Alive_2018", "LongestLeaf_cm_2019", "Alive_2019", "LongestLeaf_cm_2020", "Alive_2020", "Flowering_2018", "Flowering_2019", "Flowering_2020", "No_Capsules_2018", "No_Capsules_2019", "No_Capsules_2020", "Stem_Herbivory_2018", "Stem_Herbivory_2019", "Stem_Herbivory_2020", "Invert_Herbivory_2018", "Invert_Herbivory_2019", "Invert_Herbivory_2020", "LeafSpots_2018", "LeafSpots_2019", "LeafSpots_2020"))
 
 ## remove messed up rows (for now...)
