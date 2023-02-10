@@ -7,8 +7,16 @@ library(tidyverse)
 ## load COBP demographic data
 
 ## remove data that isn't necessary (notes, leaf spots, invert, stem #s, #capsules, bolting)
-butterfly_temp <- read.csv("/Users/Alice/Dropbox/Grad School/Research/Oenothera coloradensis project/Raw Data/COBP_data_08_23_21.csv") %>% 
-  dplyr::select(c("Location", "Site", "Plot_ID", "Quadrant", "ID", "X_cm", "Y_cm", "LongestLeaf_cm_2018", "Alive_2018", "LongestLeaf_cm_2019", "Alive_2019", "LongestLeaf_cm_2020", "Alive_2020", "Flowering_2018", "Flowering_2019", "Flowering_2020", "No_Capsules_2018", "No_Capsules_2019", "No_Capsules_2020", "Stem_Herbivory_2018", "Stem_Herbivory_2019", "Stem_Herbivory_2020", "Invert_Herbivory_2018", "Invert_Herbivory_2019", "Invert_Herbivory_2020", "LeafSpots_2018", "LeafSpots_2019", "LeafSpots_2020"))
+butterfly_temp <- read.csv("../Raw Data/COBP_data_08_23_21.csv") %>% 
+  dplyr::select(c("Location", "Site", "Plot_ID", "Quadrant", "ID", "X_cm", "Y_cm", 
+                  "LongestLeaf_cm_2018", "Alive_2018", 
+                  "LongestLeaf_cm_2019", "Alive_2019", 
+                  "LongestLeaf_cm_2020", "Alive_2020", 
+                  "Flowering_2018", "Flowering_2019", "Flowering_2020", 
+                  "No_Capsules_2018", "No_Capsules_2019", "No_Capsules_2020", 
+                  "Stem_Herbivory_2018", "Stem_Herbivory_2019", "Stem_Herbivory_2020", 
+                  "Invert_Herbivory_2018", "Invert_Herbivory_2019", "Invert_Herbivory_2020", 
+                  "LeafSpots_2018", "LeafSpots_2019", "LeafSpots_2020"))
 
 ## remove messed up rows (for now...)
 # butterfly_temp$index <- paste0(butterfly_temp$Plot_ID,"_", butterfly_temp$ID)
@@ -59,9 +67,15 @@ butterfly[which(butterfly$survives_t==1 & is.na(butterfly$flowering)),"flowering
 butterfly$survives_tplus1 <- NA
 ## make a column that contains size in previous year
 butterfly$longestLeaf_tminus1 <- NA
+## make a column that contains size in the next year
 butterfly$longestLeaf_tplus1 <- NA
+## make a column that contains age information (NA = don't know when it was recruited)
 butterfly$age <- NA
+## make a column indicating whether it is a seedling (should be 0 for all data here)
 butterfly$seedling <- 0
+## make a column for recruit information 
+butterfly$recruit <- NA
+
 ## give the survival status from the next year to the current year
 ## assign an arbitrary index to each row in 'butterfly' 
 butterfly$index <- 1:nrow(butterfly)
@@ -98,16 +112,20 @@ for (i in unique(butterfly$Plot_ID)) {
       size_2 <- temp_1$LongestLeaf_cm
       size_2New <- c(size_2[2:length(size_2)], NA)
       temp_1$longestLeaf_tplus1 <- size_2New
-      ## get age data (only for those that aren't established in 2018, for which we don't know age)
+      ## get age and recruit data (only for those that aren't established in 2018, for which we don't know age)
       if (temp_1[1,"Year"] == 2018 & 
           temp_1[1,"seedling"] == 0) {
         temp_1$age <- NA
+        temp_1$recruit <- NA
       } else {
-        age <- seq(from = 0, to = (nrow(temp_1)-1), by = 1)
+        age <- seq(from = 1, to = (nrow(temp_1)), by = 1)
         temp_1$age <- age
+        recruit <- c(1,rep.int(0, times = nrow(temp_1)-1))
+        temp_1$recruit <- recruit
       }
     } else {
-      temp_1$age <- 0
+      temp_1$age <- 1
+      temp_1$recruit <- 1
     }
     if (exists("datOut") == FALSE) {
       datOut <- temp_1
@@ -146,11 +164,6 @@ butterfly$log_LL_tminus1 <- log(butterfly$longestLeaf_tminus1)
 # # first, remove the spaces from the site names in the butterfly d.f
 # butterfly$Site <- str_replace(string = butterfly$Site, pattern = " ", replacement = "_")
 # butterfly <- left_join(butterfly, N_dat, by = c('Plot_ID' = "Plot_ID", "Year" = "Year", "Site" = "Site", "Q"))
-
-#### get establishment/recruit size data ####
-# make a column in 'butterfly' that labels 'recruits' to the rosette stage
-butterfly$recruit <- 0
-butterfly[butterfly$age==0 & is.na(butterfly$age)==FALSE,"recruit"] <- 1
 
 ## write this long-form data to file
 write.csv(butterfly, file = "../Processed_Data/COBP_long_CURRENT.csv", row.names = FALSE)
