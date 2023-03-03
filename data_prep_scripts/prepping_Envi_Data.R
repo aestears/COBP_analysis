@@ -6,7 +6,7 @@
 
 library(tidyverse)
 # location of data files 
-datFolder <- "/Users/alicestears/Dropbox/Grad School/Research/Oenothera coloradensis project"
+datFolder <- "/Users/alicestears/Dropbox/Work/Grad School/Research/Oenothera coloradensis project"
 #### load soil moisture data ####
 soilMoist <- read.csv(paste0(datFolder,"/Raw Data/EnviData/SoilMoisture.csv"))
 # subset for m3/m3 data
