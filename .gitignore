@@ -2,4 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
-ipm_results.RData
+/intermediate_analysis_Data/
+/other_scripts/
