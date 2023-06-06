@@ -1,0 +1,73 @@
+#NEXUS
+[R-package APE, Mon Feb 24 10:20:44 2020]
+
+BEGIN TAXA;
+	DIMENSIONS NTAX = 30;
+	TAXLABELS
+		Chionomys_nivalis
+		Marmota_flaviventris
+		Callospermophilus_lateralis
+		Cercopithecus_mitis
+		Chlorocebus_aethiops
+		Erythrocebus_patas
+		Papio_cynocephalus
+		Macaca_mulatta
+		Pan_troglodytes_schweinfurthii
+		Gorilla_beringei
+		Cebus_capucinus
+		Propithecus_verreauxi
+		Rangifer_tarandus_caribou
+		Ovis_aries
+		Orcinus_orca
+		Suricata_suricatta
+		Notamacropus_eugenii
+		Turdus_torquatus
+		Falco_peregrinus
+		Falco_naumanni
+		Strix_occidentalis_occidentalis
+		Ciconia_ciconia
+		Pygoscelis_adeliae
+		Anthropoides_paradiseus
+		Centrocercus_minimus
+		Anser_caerulescens
+		Xenosaurus_platyceps
+		Xenosaurus_grandis
+		Umbonium_costatum
+		Xenoturbella_bocki
+	;
+END;
+BEGIN TREES;
+	TRANSLATE
+		1	Chionomys_nivalis,
+		2	Marmota_flaviventris,
+		3	Callospermophilus_lateralis,
+		4	Cercopithecus_mitis,
+		5	Chlorocebus_aethiops,
+		6	Erythrocebus_patas,
+		7	Papio_cynocephalus,
+		8	Macaca_mulatta,
+		9	Pan_troglodytes_schweinfurthii,
+		10	Gorilla_beringei,
+		11	Cebus_capucinus,
+		12	Propithecus_verreauxi,
+		13	Rangifer_tarandus_caribou,
+		14	Ovis_aries,
+		15	Orcinus_orca,
+		16	Suricata_suricatta,
+		17	Notamacropus_eugenii,
+		18	Turdus_torquatus,
+		19	Falco_peregrinus,
+		20	Falco_naumanni,
+		21	Strix_occidentalis_occidentalis,
+		22	Ciconia_ciconia,
+		23	Pygoscelis_adeliae,
+		24	Anthropoides_paradiseus,
+		25	Centrocercus_minimus,
+		26	Anser_caerulescens,
+		27	Xenosaurus_platyceps,
+		28	Xenosaurus_grandis,
+		29	Umbonium_costatum,
+		30	Xenoturbella_bocki
+	;
+	TREE * UNTITLED = [&R] (((((((1:0.06896551724,(2:0.03448275862,3:0.03448275862)mrcaott10477ott208064:0.03448275862)mrcaott42ott10477:0.3103448276,(((((4:0.06896551724,(5:0.03448275862,6:0.03448275862)mrcaott11135ott268326:0.03448275862)mrcaott5512ott11135:0.06896551724,(7:0.03448275862,8:0.03448275862)mrcaott33609ott111862:0.1034482759)Cercopithecinae_ott842860:0.06896551724,(9:0.03448275862,10:0.03448275862)Homininae_ott312031:0.1724137931)mrcaott786ott83926:0.03448275862,11:0.2413793103)Simiiformes_ott386195:0.03448275862,12:0.275862069)mrcaott786ott3428:0.1034482759)Euarchontoglires_ott392222:0.1379310345,(((13:0.03448275862,14:0.03448275862)mrcaott1548ott20474:0.03448275862,15:0.06896551724)mrcaott1548ott5256:0.03448275862,16:0.1034482759)mrcaott1548ott4697:0.4137931034)Boreoeutheria_ott5334778:0.03448275862,17:0.5517241379)Theria_-subclass_in_Deuterostomia-_ott229558:0.3793103448,((((((18:0.06896551724,(19:0.03448275862,20:0.03448275862)mrcaott47588ott179290:0.03448275862)mrcaott246ott47588:0.03448275862,21:0.1034482759)mrcaott246ott2907:0.06896551724,(22:0.03448275862,23:0.03448275862)mrcaott9830ott18206:0.1379310345)mrcaott246ott5272:0.03448275862,24:0.2068965517)mrcaott246ott7145:0.06896551724,(25:0.03448275862,26:0.03448275862)Galloanserae_ott5839486:0.2413793103)Neognathae_ott241846:0.06896551724,(27:0.03448275862,28:0.03448275862)Xenosaurus_ott690593:0.3103448276)mrcaott246ott1662:0.5862068966)Amniota_ott229560:0.03448275862,29:0.9655172414)mrcaott42ott49:0.03448275862,30:1)Bilateria_ott117569;
+END;
