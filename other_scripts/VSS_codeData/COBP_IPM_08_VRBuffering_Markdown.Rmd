@@ -393,9 +393,10 @@ corr.growth.sd <-
 
 ## Calculate Sensitivity 
 
-The first step in calculation of the corrected sensitivity is the calculation of matrix-level sensitivity according to Silvertown and Franco (2004), and then we apply a correction according to McDonald et al. (2017)
+Calculate the sensitivity of each vital rate using the "Brute Force Method." 
+Then, we calculate the corrected sensitivity for each rate according to McDonald et al. (2017)
 
-We calculate the overall sensitivity based on the matrix from IPM B (called "mat_all_DI") (IPM for all sites and both transitions) (I think this is correct? not too sure? Should I calculate it from the mean matrix from all 12 subpop/year IPMs instead?)
+We calculate the vital rate sensitivities based on the matrix from IPM B (called "mat_all_DI") (IPM for all sites and both transitions) (I think this is correct? not too sure? Should I calculate it from the mean matrix from all 12 subpop/year IPMs instead?)
 
 ### Calculate sensitivity for the entire matrix
 
