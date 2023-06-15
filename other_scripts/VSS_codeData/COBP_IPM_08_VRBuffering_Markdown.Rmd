@@ -498,7 +498,6 @@ flowering_OG <- (FL.fun(meshp, paramCont))
 seedProd_OG <- (SDP.fun(meshp, paramCont))
 ```
 
-
 #### Sensitivity to Survival $s(z)$    
 Calculate the un-corrected sensitivity of the IPM matrix to changes in the survival function by calculating the IPM matrix with slightly purturbed survival function 
 ```{r}
@@ -508,8 +507,16 @@ b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers
 meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
 h=(U-L)/n # bin width 
 
+## set the perturbation value (should be ~1% of the vital rate value)
+perturbVal <- 0.01
+
+## redefine the survival function to add a tiny value 
+S.fun_pert <- function(z, paramCont) {
+  mu.surv=paramCont[["survival"]]["(Intercept)",] + paramCont[["survival"]]["log_LL_t",]*z - perturbVal
+  return(1/(1 + exp(-(mu.surv))))
+}
 # Survival and growth 
-S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+S <- diag(S.fun_pert(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 # G <- t(outer(meshp,meshp,GR.fun)) # Growth
 
@@ -549,12 +556,24 @@ Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
 
 Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 
-mat_all_DI <-Pkernel+Fkernel
+ipm_perturb_Survival <-Pkernel+Fkernel
 
-eigenMat <- eigen(mat_all_DI)
-# get the lambda
-lam_all_DI <-eigenMat$values[1]
+eigenMat <- eigen(ipm_perturb_Survival)
+# get and save the purturbed lambda
+lambda_perturb_Survival <-eigenMat$values[1]
+# get and save the purturbed vital rate function
+s_perturb <- S.fun_pert(meshp, paramCont)
+```
 
+Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
+$$Sens_{s(z)} = \frac{\Delta\lambda}{\Delta s(z)} = \frac{\lambda_{perturb} - \lambda_{original}}{s(z)_{perturb} - s(z)_{original}}$$
+```{r}
+# sens_Surv_1 <- as.numeric(lambda_perturb_Survival - lambda_OG) / (s_perturb - surv_OG)
+#sens_Surv_2 <- as.numeric(lambda_perturb_Survival - lambda_OG) / (s_perturb - surv_OG)
+#sens_Surv_3 <- as.numeric(lambda_perturb_Survival - lambda_OG) / (s_perturb - surv_OG)
+sens_Surv_ <- as.numeric(lambda_perturb_Survival - lambda_OG) / (s_perturb - surv_OG)
+
+plot(sens_Surv, type = "l")
 ```
 
 Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
