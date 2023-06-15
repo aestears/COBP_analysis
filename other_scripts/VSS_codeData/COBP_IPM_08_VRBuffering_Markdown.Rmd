@@ -761,29 +761,79 @@ lines(sens_SeedProd, lty = 2)
 ```
 
 #### Sensitivity to growth probability $G(z',z)$
-Based on code and details from the Ellner, Childs and Rees book (with no integrals, because the growth function results in a matrix?)
-
-Function: $$\frac{\delta\lambda}{\delta G(z_o',z_o)} = \frac{v(z')(1-Pb(z_o))s(z_o) w(z)}{v(z)w(z)}$$
-, where $v(z)$ is the reproductive value distribution and $w(z)$ is the stable size distribution
-
-Calculate the un-corrected sensitivity of the matrix to changes in the growth prob. function
+ 
+Calculate the un-corrected sensitivity of the IPM matrix to changes in the growth probability function by calculating the IPM matrix with slightly perturbed growth probability function 
 ```{r}
-# after code in Ellner book
-# the first part, b(z)co(z), without the multiplcation by the discrete parameter
-dK_by_dG_z1z <- outer (meshp, meshp, 
-                        function (z1, z, paramCont) {
-  (1 - FL.fun(z, paramCont)) * S.fun(z, paramCont) 
-  }, 
-  paramCont 
-  )
+# Setting up the kernels
+K <- array(0,c(n+1,n+1))
+b <- L+c(0:n)*(U-L)/n # interval that each cell of the matrix covers 
+meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
+h=(U-L)/n # bin width 
 
-## then, add a row and column of zeros to represent the seedbank %%% not sure if
-# I need to do this, but I think so, otherwise the sensitivity matrix is one
-# row and one column larger?
-dK_by_dG_z1z <- cbind(0,rbind(0,dK_by_dG_z1z))
+## set the perturbation value (should be ~1% of the vital rate value)
+perturbVal <- .01
 
-# multiply by the sensitivity
-G.sens.z1z <-S *  dK_by_dG_z1z
+## redefine the growth probability function to add a tiny value 
+  # GROWTH (we assume a constant variance)
+GR.fun_pert <- function(z,zz, paramCont){
+  growth.mu = paramCont[["growth"]]["(Intercept)",1] + paramCont[["growth"]]["log_LL_t",1]*z + perturbVal
+  return(dnorm(zz, mean = growth.mu, sd = paramCont[["growth"]][1,2]))
+}
+
+# Survival and growth 
+S <- diag(S.fun(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+G <- h * t(outer(meshp,meshp,GR.fun_pert, paramCont)) # Growth
+
+#Recruits distribution (seeds recruited from the seedbank into the continuous stage)
+c_o <- h * matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F)
+
+#Probability of flowering
+Pb = (FL.fun(meshp, paramCont))
+
+#Number of seeds produced according to adult size
+b_seed = (SDP.fun(meshp, paramCont))
+
+FecALL= Pb * b_seed
+
+# update the 'S' matrix by multiplying it by (1-Pb), since this is a monocarpic perennial
+S_new <- S * (1-(Pb))
+
+# Control for eviction:
+# this is equivalent to redistributing evicted sizes evenly among existing size classes 
+G <- G/matrix(as.vector(apply(G,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+c_o <- c_o/matrix(as.vector(apply(c_o,2,sum)),nrow=n,ncol=n,byrow=TRUE)
+
+# make the continuous part of the P matrix
+Pkernel.cont <- as.matrix(G %*% S_new)
+
+# seedbank (first column of your K)
+Pkernel.seedbank = c(staySB, outSB*c_o[,1]) # seeds survive and go to continuous
+
+# Make the full P kernel
+Pkernel <- cbind(Pkernel.seedbank,rbind(rep(0,length(meshp)),Pkernel.cont)) # discrete component
+
+## make the F kernel
+Fkernel.cont <-  as.matrix(goCont * ((c_o) %*% diag(FecALL))) # the size of seedlings that go into the seed bank from each continuous size class
+
+Fkernel.discr  <- matrix(c(0, goSB * (FecALL)), nrow = 1)
+
+Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
+
+ipm_perturb_Growth <-Pkernel+Fkernel
+
+eigenMat <- eigen(ipm_perturb_Growth)
+# get and save the purturbed lambda
+lambda_perturb_Growth <-eigenMat$values[1]
+# get and save the purturbed vital rate function
+G_perturb <- t(outer(meshp,meshp,GR.fun_pert, paramCont))
+```
+
+Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
+$$Sens_{G(z',z)} = \frac{\Delta\lambda}{\Delta G(z',z)} = \frac{\lambda_{perturb} - \lambda_{original}}{G(z',z)_{perturb} - G(z',z)_{original}}$$
+```{r}
+sens_Growth <- as.numeric(lambda_perturb_Growth - lambda_OG) / (G_perturb - growth_OG)
+
+image(sens_Growth)
 ```
 
 Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
@@ -796,6 +846,7 @@ where $\frac{\delta\lambda}{\delta Pb(z)}$ is the sensitivity calculated above
 # VSS on growth probability 
 
 # calculate VSS 
-VSS.growth <- G.sens.z1z[2:501,2:501] * ((growth.mean*(1-growth.mean))/lambda)
+VSS.growth <- sens_Growth * ((growth.mean*(1-growth.mean))/as.numeric(lambda_OG))
+image(VSS.growth)
 ```
 
