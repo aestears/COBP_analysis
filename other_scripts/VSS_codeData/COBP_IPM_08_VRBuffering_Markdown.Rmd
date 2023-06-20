@@ -833,7 +833,7 @@ $$Sens_{G(z',z)} = \frac{\Delta\lambda}{\Delta G(z',z)} = \frac{\lambda_{perturb
 ```{r}
 sens_Growth <- as.numeric(lambda_perturb_Growth - lambda_OG) / (G_perturb - growth_OG)
 
-image(sens_Growth)
+#image(sens_Growth)
 ```
 
 Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
@@ -847,6 +847,6 @@ where $\frac{\delta\lambda}{\delta Pb(z)}$ is the sensitivity calculated above
 
 # calculate VSS 
 VSS.growth <- sens_Growth * ((growth.mean*(1-growth.mean))/as.numeric(lambda_OG))
-image(VSS.growth)
+#image(VSS.growth)
 ```
 
