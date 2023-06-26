@@ -278,38 +278,15 @@ SDP.fun <- function(z, paramCont) {
 }
 
 # calculate seed production based on model parameters for each IPM
-seedProd <- lapply(
+seedProd <- sapply(
   allIPMs,
   FUN = function(x)
     SDP.fun(z = meshp, paramCont = x$params)
 )
 
 
-# at this point, 'seedProd' is a list where each list element is for a subpop/year, and contains a vector of seed production
-# we need to make this into a full matrix
-# first, make the continuous part (put the seed production vector on the diagonal)
-seedProd.cont <- lapply(
-  seedProd,
-  FUN = function(x)
-    as.matrix(diag(x))
-)
-
-# add discrete part (contribution of flowering probability to the seedbank)
-seedProd.disc <- lapply(
-  seedProd,
-  FUN = function(x)
-    matrix(c(0, x), nrow = 1)
-)
-
-# combine into one matrix
-for (i in 1:length(seedProd.cont)) {
-  seedProd[[i]] <-
-    rbind(seedProd.disc[[i]], cbind(rep(0, length.out = 500),
-                                    seedProd.cont[[i]]))
-}
-
-# are there any values of 0 in the seed production matrices?
-unlist(lapply(seedProd, FUN = function(x) sum(x==0))) >0
+# are there any values of 0 in the seed production vectors?
+sum(unlist(lapply(seedProd, FUN = function(x) sum(x==0))) >0)
 
 # Since the correction that we must apply to fecundities is the
 # log-transformation, we encounter problems when the the vital rate has a value
@@ -319,8 +296,9 @@ unlist(lapply(seedProd, FUN = function(x) sum(x==0))) >0
 # a small value (0.01) to the fecundity value which is 0, over all the years of
 # the study. This way, we keep a biological meaning, and we stay consistent.
 
-seedProd <- lapply(
-  seedProd,
+seedProd <- apply(
+  X = seedProd,
+  MARGIN = 2,
   FUN =
     function(x)
       replace(x, list = which(x == 0, arr.ind = TRUE), values =
@@ -328,14 +306,28 @@ seedProd <- lapply(
 ) 
 
 #Now, calculate mean seedProd probability
-seedProd.mu <- apply(simplify2array(seedProd), 1:2, mean) 
+seedProd.mu <- apply(simplify2array(seedProd), 1, mean) 
 # this is a matrix that is an average of all of the different seed production matrices from each IPM 
 
+# plot(seedProd.mu, type = "l", ylim = c(0,13000), lwd = 2)
+# lines(seedProd[,1], lty = 2)
+# lines(seedProd[,2], lty = 2)
+# lines(seedProd[,3], lty = 2)
+# lines(seedProd[,4], lty = 2)
+# lines(seedProd[,5], lty = 2)
+# lines(seedProd[,6], lty = 2)
+# lines(seedProd[,7], lty = 2)
+# lines(seedProd[,8], lty = 2)
+# lines(seedProd[,9], lty = 2)
+# lines(seedProd[,10], lty = 2)
+# lines(seedProd[,11], lty = 2)
+# lines(seedProd[,12], lty = 2)
+
 # sd of seed production 
-seedProd.sd <- apply(simplify2array(seedProd), 1:2, sd)
+seedProd.sd <- apply(simplify2array(seedProd), 1, sd)
 
 # get the corrected sd (use a log transformation, since it is NOT a probability) 
-corr.seedProd.sd <- apply(log(simplify2array(seedProd)), 1:2 ,sd) 
+corr.seedProd.sd <- apply(log(simplify2array(seedProd)), 1 ,sd) 
 ```
 
 #### Growth $G(z',z)$
@@ -379,8 +371,6 @@ Then, we calculate the corrected sensitivity for each rate according to McDonald
 
 We calculate the vital rate sensitivities based on the matrix from IPM B (called "mat_all_DI") (IPM for all sites and both transitions) (I think this is correct? not too sure? Should I calculate it from the mean matrix from all 12 subpop/year IPMs instead?)
 
-
-### Calculate vital rate sensitivity
 #### Preparation
 
 First, get parameter values used to make the all pops, all transitions IPM, and save in a list
@@ -850,4 +840,31 @@ where $\frac{\delta\lambda}{\delta Pb(z)}$ is the sensitivity calculated above
 VSS.growth <- sens_Growth * ((growth.mean*(1-growth.mean))/as.numeric(lambda_OG))
 #image(VSS.growth)
 ```
+
+
+## Compare VSS and corrected standard deviation of vital rates (to look for evidence of demographic buffering hypothesis[DBH])
+Support for DBH: a negative correlation between vital rate importance (VSS) and vital rate variation (corrected sd)
+
+
+??? Can we do this across the entire set of vital rates ???
+```{r}
+bigDF <- data.frame("VSS" = c(VSS.surv, VSS.seeds, VSS.flwr#, as.vector(VSS.growth)
+                              ),
+                    "corrSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd#, as.vector(corr.growth.sd)
+                                 )
+                                 )
+# correlation between VSS and corrected standard deviation
+bigDF_cor <- cor(bigDF$VSS, bigDF$corrSD)
+
+plot(x = bigDF$VSS, y = bigDF$corrSD)
+text(x = 2, y = 2, labels = paste0("Corr = ", round(bigDF_cor, 4)))
+
+# remove the massive outlier...
+bigDF_noOut <- bigDF[bigDF$VSS != max(bigDF$VSS),]
+bigDF_noOut_cor <- cor(bigDF_noOut$VSS, bigDF_noOut$corrSD)
+
+plot(x = bigDF_noOut$VSS, y = bigDF_noOut$corrSD)
+text(x = 30, y = 2, labels = paste0("Corr = ", round(bigDF_noOut_cor, 4)))
+```
+
 
