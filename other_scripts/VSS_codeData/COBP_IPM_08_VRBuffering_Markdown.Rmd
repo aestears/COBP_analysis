@@ -480,7 +480,7 @@ seedProd_OG <- (SDP.fun(meshp, paramCont))
 ```
 
 #### Sensitivity to Survival $s(z)$    
-Calculate the un-corrected sensitivity of the IPM matrix to changes in the survival function by calculating the IPM matrix with slightly purturbed survival function 
+Calculate the un-corrected sensitivity of the IPM matrix to changes in the survival function by calculating the IPM matrix with slightly perturbed survival function 
 ```{r}
 # Setting up the kernels
 K <- array(0,c(n+1,n+1))
@@ -489,15 +489,15 @@ meshp <- 0.5*(b[1:n]+b[2:(n+1)]) # midpoint
 h=(U-L)/n # bin width 
 
 ## set the perturbation value (should be ~1% of the vital rate value)
-perturbVal <- 0.01
+perturbVal <- 0.05
 
 ## redefine the survival function to add a tiny value 
 S.fun_pert <- function(z, paramCont) {
-  mu.surv=paramCont[["survival"]]["(Intercept)",] + paramCont[["survival"]]["log_LL_t",]*z - perturbVal
-  return(1/(1 + exp(-(mu.surv))))
+  mu.surv=paramCont[["survival"]]["(Intercept)",] + paramCont[["survival"]]["log_LL_t",]*z 
+  return(1/(1 + exp(-(mu.surv))) + perturbVal)
 }
 # Survival and growth 
-S <- diag(S.fun_pert(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
+S<- diag(S.fun_pert(meshp, paramCont)) # Survival # put survival probabilities in the diagonal of the matrix
 G <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # Growth
 # G <- t(outer(meshp,meshp,GR.fun)) # Growth
 
@@ -576,7 +576,7 @@ lines(VSS.surv, lty = 2)
 #### Sensitivity to Flowering probability $P_b(z)$
  
 Calculate the un-corrected sensitivity of the IPM matrix to changes in the flowering function by calculating the IPM matrix with slightly perturbed flowering function 
-%%% I'm really not sure where I should add the perturbation to this function? Should it be before it goes through the logit transformation??
+%%% I'm really not sure where I should add the perturbation to this function? Based on example code from Levin ESA workshop, added it after the logit transformation??
 ```{r}
 # Setting up the kernels
 K <- array(0,c(n+1,n+1))
@@ -637,9 +637,9 @@ Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 ipm_perturb_Flowering <-Pkernel+Fkernel
 
 eigenMat <- eigen(ipm_perturb_Flowering)
-# get and save the purturbed lambda
+# get and save the perturbed lambda
 lambda_perturb_Flowering <-eigenMat$values[1]
-# get and save the purturbed vital rate function
+# get and save the perturbed vital rate function
 Pb_perturb <- FL.fun_pert(meshp, paramCont)
 ```
 
@@ -664,7 +664,8 @@ where $\frac{\delta\lambda}{\delta Pb(z)}$ is the sensitivity calculated above
 VSS.flwr <- as.numeric(sens_Flowering * ((flowering.mu*(1-flowering.mu))/lambda_OG))
 
 # compare VSS of flowering to un-corrected sensitivity to flowering (the dashed line is the VSS)
-  plot(sens_Flowering,type = "l",ylim = c(0,7))
+  plot(sens_Flowering,type = "l",ylim = c(0,7)
+       )
 lines(VSS.flwr, lty = 2)
 ```
 
@@ -684,8 +685,8 @@ perturbVal <- 6
 ## redefine the seed production function to add a tiny value 
 # SEED PRODUCTION
 SDP.fun_pert <- function(z, paramCont) {
-  mu.fps=exp(paramCont[["seedProduction"]][1,1] + paramCont[["seedProduction"]][2,1]*z) + perturbVal 
-  return(mu.fps)
+  mu.fps=exp(paramCont[["seedProduction"]][1,1] + paramCont[["seedProduction"]][2,1]*z)  
+  return(mu.fps + perturbVal)
 }
 
 # Survival and growth 
@@ -756,8 +757,8 @@ where $\frac{\delta\lambda}{\delta b(z)}$ is the sensitivity calculated above
 VSS.seeds <- sens_SeedProd * (SDP.fun(meshp, paramCont)/as.numeric(lambda_OG))
 
 # compare to untransformed sensitivity
-plot(VSS.seeds, type = "l", ylim = c(0, 4.5))
-lines(sens_SeedProd, lty = 2)
+plot(sens_SeedProd, type = "l", ylim = c(0, 4.5))
+lines(VSS.seeds, lty = 2)
 ```
 
 #### Sensitivity to growth probability $G(z',z)$
