@@ -332,6 +332,7 @@ corr.seedProd.sd <- apply(log(simplify2array(seedProd)), 1 ,sd)
 
 #### Growth $G(z',z)$
 Use the growth function w/ parameters for each IPM to calculate the growth for each IPM
+NOT A PROBABILITY-- should use log, rather that logit transformation???
 ```{r}
 # GROWTH (we assume a constant variance)
 GR.fun <- function(z, zz, paramCont) {
@@ -344,7 +345,7 @@ GR.fun <- function(z, zz, paramCont) {
 growth <-
   lapply(allIPMs,
     FUN = function(x)
-      h * t(outer(meshp, meshp, GR.fun, paramCont = x$params)
+      t(outer(meshp, meshp, GR.fun, paramCont = x$params) ## don't multiply by h (integrate)...should I???
             )
     ) 
 # 'growth' is a list in which each element contains the growth matrix for one subpop/year
@@ -359,7 +360,7 @@ growth.sd <-
 
 # corrected sd of growth (use a logit transformation, since it is a probability)
 corr.growth.sd <-
-  apply(car::logit(simplify2array(growth), adjust = 0.001), 1:2, sd)
+  apply(log(simplify2array(growth)), 1:2, sd)
 ```
 
 #### We don't calculate mean and sd values for seedbank parameters and seedling size distribution, because those values were calculated at the population level (so there is no variation accross subpopulations)
@@ -813,9 +814,9 @@ Fkernel <- rbind(Fkernel.discr, cbind(rep(0, length.out = n),Fkernel.cont))
 ipm_perturb_Growth <-Pkernel+Fkernel
 
 eigenMat <- eigen(ipm_perturb_Growth)
-# get and save the purturbed lambda
+# get and save the perturbed lambda
 lambda_perturb_Growth <-eigenMat$values[1]
-# get and save the purturbed vital rate function
+# get and save the perturbed vital rate function
 G_perturb <- t(outer(meshp,meshp,GR.fun_pert, paramCont))
 ```
 
@@ -827,6 +828,19 @@ sens_Growth <- as.numeric(lambda_perturb_Growth - lambda_OG) / (G_perturb - grow
 #image(sens_Growth)
 ```
 
+
+Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
+is in turn based on McDonald et al., 2017. Because this is a number (not a probability), the VSS corresponds to the elasticity, which is found by scaling the sensitivity function by (survival / lambda): 
+
+Elasticity for $G(z',z)$ = $$\frac{\delta \lambda}{\delta G(z',z)} * \frac{G(z',z)}{\lambda} $$
+where $\frac{\delta\lambda}{\delta G(z',z)}$ is the sensitivity calculated above
+```{r}
+# VSS on Seed production  
+
+# calculate VSS 
+VSS.growth <- sens_Growth * (growth_OG/as.numeric(lambda_OG))
+
+```
 Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
 is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
 boundaries in vital rates such as survival, growth, or flowering probability.
@@ -845,10 +859,12 @@ VSS.growth <- sens_Growth * ((growth.mean*(1-growth.mean))/as.numeric(lambda_OG)
 ## Compare VSS and corrected standard deviation of vital rates (to look for evidence of demographic buffering hypothesis[DBH])
 Support for DBH: a negative correlation between vital rate importance (VSS) and vital rate variation (corrected sd)
 
+Do this for each vital rate size class
+
 
 ??? Can we do this across the entire set of vital rates ???
 ```{r}
-bigDF <- data.frame("VSS" = c(VSS.surv, VSS.seeds, VSS.flwr#, as.vector(VSS.growth)
+bigDF <- data.frame("VSS" = c(VSS.surv, VSS.seeds, VSS.flwr, as.vector(VSS.growth)
                               ),
                     "corrSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd#, as.vector(corr.growth.sd)
                                  )
