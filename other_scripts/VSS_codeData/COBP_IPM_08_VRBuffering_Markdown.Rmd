@@ -397,9 +397,13 @@ corr.seedlingSize.sd <-
   apply(car::logit(simplify2array(seedlingSize),adjust = .001), 1, sd)
 ```
 
-#### We don't calculate mean for seedbank parameters and seedling size distribution, because those values were calculated at the population level (so there is no variation accross subpopulations). We simulate standard deviation for these vital rates 
+#### We don't calculate mean for seedbank parameters and seedling size distribution, because those values were calculated at the population level (so there is no variation accross subpopulations). We simulate standard deviation for these vital rates as the maximum possible? %%% not too sure about this
 
 ```{r}
+corr.outSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
+corr.staySB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
+corr.goCont.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
+corr.goSB.sd <- sd(car::logit(seq(from = .01, to = .99, length.out = 20)))
 ```
 
 
@@ -1319,7 +1323,9 @@ bigDF <- data.frame("VitalRate" = c(rep("surv", 500), rep("seedProd", 500), rep(
 
 for (i in 1:500) {
   # calculate the correlation
-  cor_temp <- cor.test(bigDF[bigDF$sizeClass == i, "VSS"], bigDF[bigDF$sizeClass == i, "correctedSD"], method = "pearson")
+  cor_temp <- cor.test(c(bigDF[bigDF$sizeClass == i, "VSS"], VSS.outSB, VSS.staySB, VSS.goCont, VSS.goSB), 
+                       c(bigDF[bigDF$sizeClass == i, "correctedSD"], corr.outSB.sd, corr.staySB.sd, corr.goCont.sd, corr.goSB.sd),
+                       method = "pearson")
   
   
   ggplot(data = bigDF[bigDF$sizeClass == i,]) +
@@ -1335,7 +1341,7 @@ for (i in 1:500) {
   }
 }
 
-# visualize the correlation coefficiennts for each size class 
+# visualize the correlation coefficients for each size class 
 ggplot(data = correlations) +
   geom_ribbon(aes(ymin = corr_confIntLow, ymax = corr_confIntHigh, x = 1:500), fill = "lightgrey", alpha = .5) +
   geom_point(aes(x = sizeClass, y = correlation, col = corr_pVal)) + 
