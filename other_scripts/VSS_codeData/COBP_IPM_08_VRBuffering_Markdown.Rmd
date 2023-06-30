@@ -345,7 +345,7 @@ GR.fun <- function(z, zz, paramCont) {
 growth <-
   lapply(allIPMs,
     FUN = function(x)
-      t(outer(meshp, meshp, GR.fun, paramCont = x$params) ## don't multiply by h (integrate)...should I???
+      h * t(outer(meshp, meshp, GR.fun, paramCont = x$params) ## don't multiply by h (integrate)...should I???
             )
     ) 
 # 'growth' is a list in which each element contains the growth matrix for one subpop/year
@@ -458,7 +458,7 @@ h=(U-L)/n # bin width
 surv_OG <- S.fun(meshp, paramCont)
   
 # growth
-growth_OG <- t(outer(meshp,meshp,GR.fun, paramCont)) # don't multiply by h... so no integration? is this correct?
+growth_OG <- h * t(outer(meshp,meshp,GR.fun, paramCont)) # don't multiply by h... so no integration? is this correct?
 
 # seedling size distribution
 seedlingSize_OG <-  matrix(rep(SDS.fun(meshp, paramCont),n),n,n,byrow=F) # don't multiply by h... so no integration? is this correct?
@@ -817,7 +817,7 @@ eigenMat <- eigen(ipm_perturb_Growth)
 # get and save the perturbed lambda
 lambda_perturb_Growth <-eigenMat$values[1]
 # get and save the perturbed vital rate function
-G_perturb <- t(outer(meshp,meshp,GR.fun_pert, paramCont))
+G_perturb <- h * t(outer(meshp,meshp,GR.fun_pert, paramCont))
 ```
 
 Now, calculate the sensitivity by comparing the perturbed to unperturbed lambdas and vital rate function of interest
@@ -835,24 +835,14 @@ is in turn based on McDonald et al., 2017. Because this is a number (not a proba
 Elasticity for $G(z',z)$ = $$\frac{\delta \lambda}{\delta G(z',z)} * \frac{G(z',z)}{\lambda} $$
 where $\frac{\delta\lambda}{\delta G(z',z)}$ is the sensitivity calculated above
 ```{r}
-# VSS on Seed production  
+# VSS on growth ≈
 
 # calculate VSS 
-VSS.growth <- sens_Growth * (growth_OG/as.numeric(lambda_OG))
+# version for non-probability vital rate
+# VSS.growth <- sens_Growth * (growth_OG/as.numeric(lambda_OG))
+# version for probability vital rate
+VSS.growth <- as.numeric(sens_Growth * ((growth.mean*(1-flowering.mu))/lambda_OG))
 
-```
-Now, calculate the corrected sensitivity (VSS) based on code from Maria, which 
-is in turn based on McDonald et al., 2017. This correction accounts for 0-1 
-boundaries in vital rates such as survival, growth, or flowering probability.
-
-VSS for $G(z',z)$ = $$\frac{G(z',z)(1-G(z',z))}{\lambda} \frac{\delta\lambda}{\delta G(z',z)}$$
-where $\frac{\delta\lambda}{\delta Pb(z)}$ is the sensitivity calculated above
-```{r}
-# VSS on growth probability 
-
-# calculate VSS 
-VSS.growth <- sens_Growth * ((growth.mean*(1-growth.mean))/as.numeric(lambda_OG))
-#image(VSS.growth)
 ```
 
 
@@ -861,12 +851,15 @@ Support for DBH: a negative correlation between vital rate importance (VSS) and 
 
 Do this for each vital rate size class
 
-
-??? Can we do this across the entire set of vital rates ???
 ```{r}
+# put all the vital rates into one data.frame
+
+
+
+
 bigDF <- data.frame("VSS" = c(VSS.surv, VSS.seeds, VSS.flwr, as.vector(VSS.growth)
                               ),
-                    "corrSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd#, as.vector(corr.growth.sd)
+                    "corrSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd, as.vector(corr.growth.sd)
                                  )
                                  )
 # correlation between VSS and corrected standard deviation
@@ -875,12 +868,6 @@ bigDF_cor <- cor(bigDF$VSS, bigDF$corrSD)
 plot(x = bigDF$VSS, y = bigDF$corrSD)
 text(x = 2, y = 2, labels = paste0("Corr = ", round(bigDF_cor, 4)))
 
-# remove the massive outlier...
-bigDF_noOut <- bigDF[bigDF$VSS != max(bigDF$VSS),]
-bigDF_noOut_cor <- cor(bigDF_noOut$VSS, bigDF_noOut$corrSD)
-
-plot(x = bigDF_noOut$VSS, y = bigDF_noOut$corrSD)
-text(x = 30, y = 2, labels = paste0("Corr = ", round(bigDF_noOut_cor, 4)))
 ```
 
 
