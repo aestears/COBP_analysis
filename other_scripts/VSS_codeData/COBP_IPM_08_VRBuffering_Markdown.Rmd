@@ -365,11 +365,41 @@ corr.growth.sd <-
   apply(car::logit(simplify2array(growth),adjust = .001), 1, sd)
 ```
 
+#### seedling size distribution $c_0(z)$
+Use the seedling size distribution function w/ parameters for each IPM to calculate the growth for each IPM
+```{r}
+ ## SEEDLING SIZES (same approach as in growth function)
+  SDS.fun <- function(zz, paramCont){
+    rec_mu <- paramCont$c_o_mu
+    rec_sd <- paramCont$c_o_sd
+    return(dnorm(zz, mean = rec_mu, sd = rec_sd))
+  }
+# calculate the growth matrix based on model parameters for each IPM
+seedlingSize <-
+  lapply(allIPMs,
+    FUN = function(x)
+      h * SDS.fun(zz = meshp, paramCont = x$params) 
+    ) 
+# 'seedling size' is a list in which each element contains the growth matrix for one subpop/year
+    
+#Calculate the mean of seedling size
+#growth.mean <-
+    #apply(simplify2array(growth), 1:2, mean) 
+seedlingSize.mean <- apply(simplify2array(seedlingSize), 1, mean)
+
+# sd of SeedlingSize 
+#SeedlingSize.sd <-
+    #apply(simplify2array(SeedlingSize), 1:2, sd) 
+seedlingSize.sd <- apply(simplify2array(seedlingSize), 1, sd)
+
+# corrected sd of SeedlingSize (use a logit transformation, since it is a probability)
+corr.seedlingSize.sd <-
+  apply(car::logit(simplify2array(seedlingSize),adjust = .001), 1, sd)
+```
 
 #### We don't calculate mean for seedbank parameters and seedling size distribution, because those values were calculated at the population level (so there is no variation accross subpopulations). We simulate standard deviation for these vital rates 
 
 ```{r}
-
 ```
 
 
@@ -944,7 +974,7 @@ where $\frac{\delta\lambda}{\delta c_0(z)}$ is the sensitivity calculated above
 
 # calculate VSS 
 # instead of mean seedling size, just use seedlingSize_OG, since they're all simulated...
-VSS.SeedlingSize <- as.numeric(sens_SeedlingSize * ((seedlingSize_OG*(1-seedlingSize_OG))/lambda_OG))
+VSS.SeedlingSize <- as.numeric(sens_SeedlingSize * ((seedlingSize.mean*(1-seedlingSize.mean))/lambda_OG))
 
 plot(VSS.SeedlingSize, type = "l")
 lines(sens_SeedlingSize, lty = 2)
@@ -956,10 +986,10 @@ Do this for each vital rate size class
 
 ```{r}
 # put all the vital rates into one data.frame
-bigDF <- data.frame("VitalRate" = c(rep("surv", 500), rep("seedProd", 500), rep("flowerProb", 500), rep("growth", 500)),
-                    "sizeClass" = rep(1:500, times = 4),
-                    "VSS" = c(VSS.surv, VSS.seeds, VSS.flwr, VSS.growth), 
-                    "correctedSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd, corr.growth.sd)
+bigDF <- data.frame("VitalRate" = c(rep("surv", 500), rep("seedProd", 500), rep("flowerProb", 500), rep("growth", 500), rep("seedlingSize", 500)),
+                    "sizeClass" = rep(1:500, times = 5),
+                    "VSS" = c(VSS.surv, VSS.seeds, VSS.flwr, VSS.growth, VSS.SeedlingSize), 
+                    "correctedSD" = c(corr.surv.sd, corr.seedProd.sd, corr.flowering.sd, corr.growth.sd, corr.seedlingSize.sd)
                     )
 
 for (i in 1:500) {
