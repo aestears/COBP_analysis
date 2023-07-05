@@ -1349,14 +1349,3 @@ ggplot(data = correlations) +
 ```
 
 
-```{r}
-
-# correlation between VSS and corrected standard deviation
-bigDF_cor <- cor(bigDF$VSS, bigDF$corrSD)
-
-plot(x = bigDF$VSS, y = bigDF$corrSD)
-text(x = 2, y = 2, labels = paste0("Corr = ", round(bigDF_cor, 4)))
-
-```
-
-
