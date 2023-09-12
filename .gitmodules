@@ -1,0 +1,3 @@
+[submodule "COBP_demography_MANUSCRIPT"]
+	path = COBP_demography_MANUSCRIPT
+	url = git@github.com:aestears/COBP_demography_MANUSCRIPT.git
