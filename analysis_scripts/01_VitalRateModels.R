@@ -9,8 +9,6 @@ library(tidyverse)
 library(lme4) 
 library(MASS)
 #### load data from the previous script ####
-# (COBP_IPM_01_dataPrep.R)
-#source("./analysis_scripts/COBP_IPM_01_dataPrep.R")
 dat_all <- read.csv(file = "../Processed_Data/allDat_plus_contSeedlings.csv")
 discDat <- read.csv(file = "../Processed_Data/discreteStageData.csv")
 
